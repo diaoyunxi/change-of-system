@@ -1,0 +1,47 @@
+# change-of-system configuration file.
+# Lines starting with '#' or ';' are comments.
+# Values shown below are the defaults.
+
+# ------------------------------
+# Filesystem monitor
+# ------------------------------
+filesystem.enabled = true
+filesystem.poll_interval_ms = 2000
+filesystem.use_native = true
+# Comma-separated list of directories or files to watch.
+filesystem.watch_paths = /etc, /tmp
+
+# ------------------------------
+# Process monitor
+# ------------------------------
+process.enabled = true
+process.poll_interval_ms = 3000
+process.track_cpu = true
+process.track_memory = true
+
+# ------------------------------
+# Network monitor
+# ------------------------------
+network.enabled = true
+network.poll_interval_ms = 5000
+
+# ------------------------------
+# System config monitor
+# ------------------------------
+system_config.enabled = true
+system_config.poll_interval_ms = 10000
+
+# ------------------------------
+# Storage
+# ------------------------------
+storage.database_path = change-of-system.log
+storage.max_events = 100000
+
+# ------------------------------
+# Remote reporting (optional)
+# ------------------------------
+reporting.enabled = false
+reporting.endpoint = https://example.com/api/events
+reporting.api_key =
+reporting.batch_size = 100
+reporting.interval_ms = 10000

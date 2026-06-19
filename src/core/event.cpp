@@ -1,0 +1,74 @@
+#include "core/event.h"
+
+namespace changeos {
+
+std::string category_name(EventCategory c) {
+    switch (c) {
+        case EventCategory::Filesystem: return "filesystem";
+        case EventCategory::Process: return "process";
+        case EventCategory::Network: return "network";
+        case EventCategory::SystemConfig: return "system_config";
+        default: return "unknown";
+    }
+}
+
+std::string type_name(EventType t) {
+    switch (t) {
+        case EventType::FileCreated: return "file_created";
+        case EventType::FileModified: return "file_modified";
+        case EventType::FileDeleted: return "file_deleted";
+        case EventType::FileMoved: return "file_moved";
+        case EventType::FilePermissionChanged: return "file_permission_changed";
+
+        case EventType::ProcessStarted: return "process_started";
+        case EventType::ProcessStopped: return "process_stopped";
+        case EventType::ProcessCpuSpike: return "process_cpu_spike";
+        case EventType::ProcessMemorySpike: return "process_memory_spike";
+
+        case EventType::NetworkConnectionOpened: return "network_connection_opened";
+        case EventType::NetworkConnectionClosed: return "network_connection_closed";
+        case EventType::NetworkBandwidthSpike: return "network_bandwidth_spike";
+        case EventType::NetworkDnsQuery: return "network_dns_query";
+
+        case EventType::ConfigValueChanged: return "config_value_changed";
+        case EventType::ServiceStateChanged: return "service_state_changed";
+        case EventType::UserLoggedIn: return "user_logged_in";
+        case EventType::UserLoggedOut: return "user_logged_out";
+
+        default: return "unknown";
+    }
+}
+
+EventCategory category_of(EventType t) {
+    switch (t) {
+        case EventType::FileCreated:
+        case EventType::FileModified:
+        case EventType::FileDeleted:
+        case EventType::FileMoved:
+        case EventType::FilePermissionChanged:
+            return EventCategory::Filesystem;
+
+        case EventType::ProcessStarted:
+        case EventType::ProcessStopped:
+        case EventType::ProcessCpuSpike:
+        case EventType::ProcessMemorySpike:
+            return EventCategory::Process;
+
+        case EventType::NetworkConnectionOpened:
+        case EventType::NetworkConnectionClosed:
+        case EventType::NetworkBandwidthSpike:
+        case EventType::NetworkDnsQuery:
+            return EventCategory::Network;
+
+        case EventType::ConfigValueChanged:
+        case EventType::ServiceStateChanged:
+        case EventType::UserLoggedIn:
+        case EventType::UserLoggedOut:
+            return EventCategory::SystemConfig;
+
+        default:
+            return EventCategory::Unknown;
+    }
+}
+
+} // namespace changeos

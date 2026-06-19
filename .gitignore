@@ -1,0 +1,41 @@
+# Build artifacts
+build/
+build-*/
+build_debug/
+build_release/
+cmake-build-*/
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+
+# CMake caches
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+CTestTestfile.cmake
+compile_commands.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Qt generated
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+*.autosave
+
+# Runtime data
+change-of-system.log
+change-of-system.db
+*.log
