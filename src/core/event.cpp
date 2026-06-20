@@ -1,6 +1,71 @@
 #include "core/event.h"
+#include <sstream>
+#include <iomanip>
 
 namespace changeos {
+
+namespace {
+std::string escape_json(const std::string& s) {
+    std::ostringstream oss;
+    for (char c : s) {
+        switch (c) {
+            case '"': oss << "\\\""; break;
+            case '\\': oss << "\\\\"; break;
+            case '\n': oss << "\\n"; break;
+            case '\r': oss << "\\r"; break;
+            case '\t': oss << "\\t"; break;
+            default: oss << c;
+        }
+    }
+    return oss.str();
+}
+}
+
+std::string to_json(const Event& event, bool pretty) {
+    std::ostringstream oss;
+    std::string indent = pretty ? "  " : "";
+    std::string newline = pretty ? "\n" : "";
+    std::string sep = pretty ? " " : "";
+
+    oss << "{" << newline;
+    oss << indent << "\"id\":" << sep << event.id << "," << newline;
+    oss << indent << "\"timestamp\":" << sep << to_unix_ms(event.timestamp) << "," << newline;
+    oss << indent << "\"category\":" << sep << "\"" << escape_json(category_name(event.category)) << "\"," << newline;
+    oss << indent << "\"type\":" << sep << "\"" << escape_json(type_name(event.type)) << "\"," << newline;
+    oss << indent << "\"source\":" << sep << "\"" << escape_json(event.source) << "\"," << newline;
+    oss << indent << "\"target\":" << sep << "\"" << escape_json(event.target) << "\"," << newline;
+    oss << indent << "\"host\":" << sep << "\"" << escape_json(event.host) << "\"," << newline;
+    oss << indent << "\"platform\":" << sep << "\"" << escape_json(event.platform) << "\"," << newline;
+    oss << indent << "\"summary\":" << sep << "\"" << escape_json(event.summary) << "\"," << newline;
+
+    oss << indent << "\"attributes\":" << sep << "{";
+    bool first = true;
+    for (const auto& [k, v] : event.attributes) {
+        if (!first) oss << ",";
+        oss << newline << indent << indent << "\"" << escape_json(k) << "\":" << sep << "\"" << escape_json(v) << "\"";
+        first = false;
+    }
+    if (!event.attributes.empty()) oss << newline << indent;
+    oss << "}" << newline;
+    oss << "}";
+
+    return oss.str();
+}
+
+std::string to_json(const std::vector<Event>& events, bool pretty) {
+    std::ostringstream oss;
+    std::string indent = pretty ? "  " : "";
+    std::string newline = pretty ? "\n" : "";
+
+    oss << "[" << newline;
+    for (size_t i = 0; i < events.size(); ++i) {
+        oss << indent << to_json(events[i], pretty);
+        if (i + 1 < events.size()) oss << ",";
+        oss << newline;
+    }
+    oss << "]";
+    return oss.str();
+}
 
 std::string category_name(EventCategory c) {
     switch (c) {

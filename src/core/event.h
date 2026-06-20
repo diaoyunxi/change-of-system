@@ -69,6 +69,9 @@ struct Event {
     std::string platform;
 };
 
+std::string to_json(const Event& event, bool pretty = false);
+std::string to_json(const std::vector<Event>& events, bool pretty = false);
+
 using EventList = std::vector<Event>;
 
 } // namespace changeos
