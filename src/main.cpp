@@ -4,6 +4,7 @@
 #include "monitor/process/process_monitor.h"
 #include "monitor/system_config/system_config_monitor.h"
 #include "platform/platform_detection.h"
+#include "platform/privilege.h"
 #include "storage/storage.h"
 #include "utils/logger.h"
 
@@ -38,6 +39,8 @@ void print_usage(const char* prog) {
         << "  -c, --config <path>   Path to configuration file\n"
         << "  -h, --help            Show this help message\n"
         << "  --version             Show version information\n"
+        << "  --auto-escalate       Automatically escalate privileges if needed\n"
+        << "  --no-escalate         Disable automatic privilege escalation\n"
         << "\n"
         << "Run Options:\n"
         << "  --no-daemon           Run in the foreground (default)\n"
@@ -55,7 +58,8 @@ void print_usage(const char* prog) {
         << "  --pretty              Pretty-print JSON output\n"
         << "  -o, --output <path>   Output file path (for export command)\n"
         << "\n"
-        << "Platform: " << changeos::platform::name() << "\n";
+        << "Platform: " << changeos::platform::name() << "\n"
+        << "Current privilege: " << changeos::platform::privilege_level_name(changeos::platform::current_privilege_level()) << "\n";
 }
 
 void print_version() {
@@ -146,12 +150,19 @@ int cmd_status(const std::string& config_path) {
         return 1;
     }
 
+    auto priv_level = changeos::platform::current_privilege_level();
+    
     std::cout << "=== System Information ===\n"
               << "Platform: " << changeos::platform::name() << "\n"
               << "Architecture: " << changeos::platform::architecture() << "\n"
               << "Hostname: " << changeos::platform::hostname() << "\n"
               << "Username: " << changeos::platform::username() << "\n"
               << "OS Version: " << changeos::platform::version() << "\n"
+              << "\n"
+              << "=== Privilege Information ===\n"
+              << "Current privilege: " << changeos::platform::privilege_level_name(priv_level) << "\n"
+              << "Is privileged: " << (changeos::platform::is_privileged() ? "Yes" : "No") << "\n"
+              << "Can escalate: " << (changeos::platform::can_escalate_privileges() ? "Yes" : "No") << "\n"
               << "\n";
 
     auto* storage = engine.storage();
@@ -222,6 +233,8 @@ int main(int argc, char** argv) {
     std::string category;
     bool json_output = false;
     bool pretty = false;
+    bool auto_escalate = false;
+    bool no_escalate = false;
     int limit = 100;
     int offset = 0;
     std::int64_t from_ms = 0;
@@ -247,6 +260,10 @@ int main(int argc, char** argv) {
         } else if (arg == "--pretty") {
             pretty = true;
             json_output = true; // pretty implies json
+        } else if (arg == "--auto-escalate") {
+            auto_escalate = true;
+        } else if (arg == "--no-escalate") {
+            no_escalate = true;
         } else if ((arg == "-o" || arg == "--output") && i + 1 < argc) {
             output_path = argv[++i];
         } else if (arg == "--from" && i + 1 < argc) {
@@ -261,6 +278,33 @@ int main(int argc, char** argv) {
             try { limit = std::stoi(argv[++i]); } catch (...) {}
         } else if (arg == "--offset" && i + 1 < argc) {
             try { offset = std::stoi(argv[++i]); } catch (...) {}
+        }
+    }
+
+    // Handle privilege escalation
+    if (auto_escalate && !no_escalate) {
+        if (!changeos::platform::is_privileged()) {
+            if (changeos::platform::can_escalate_privileges()) {
+                std::cout << "Requesting elevated privileges...\n";
+                
+                // Build command line arguments for re-execution
+                std::string args;
+                for (int i = 1; i < argc; ++i) {
+                    if (args.length() > 0) args += " ";
+                    // Skip the --auto-escalate flag to avoid infinite loop
+                    if (std::string(argv[i]) == "--auto-escalate") continue;
+                    args += argv[i];
+                }
+                
+                if (changeos::platform::reexecute_as_admin(args)) {
+                    // Successfully re-executed, exit current process
+                    return 0;
+                } else {
+                    std::cerr << "Warning: Failed to escalate privileges, continuing with current permissions\n";
+                }
+            } else {
+                std::cerr << "Warning: Cannot escalate privileges on this system\n";
+            }
         }
     }
 
