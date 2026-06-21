@@ -1,6 +1,9 @@
 #pragma once
 
 #include "core/event.h"
+#include "alert/alert_manager.h"
+#include "filter/event_filter.h"
+#include "stats/statistics.h"
 
 #include <atomic>
 #include <functional>
@@ -47,6 +50,9 @@ public:
 
     storage::Storage* storage();
     reporting::Reporter* reporter();
+    alert::AlertManager* alert_manager();
+    filter::EventFilter* event_filter();
+    stats::StatisticsCollector* statistics();
 
     std::vector<Event> recent_events(int limit = 100) const;
 
@@ -60,6 +66,9 @@ private:
 
     std::unique_ptr<storage::Storage> storage_;
     std::unique_ptr<reporting::Reporter> reporter_;
+    std::unique_ptr<alert::AlertManager> alert_manager_;
+    std::unique_ptr<filter::EventFilter> event_filter_;
+    std::unique_ptr<stats::StatisticsCollector> statistics_;
 
     mutable std::mutex callbacks_mutex_;
     std::vector<EventCallback> callbacks_;

@@ -55,6 +55,33 @@ bool MonitorEngine::initialize(const std::string& config_path) {
         cfg.get_int("reporting.interval_ms", 10000));
     reporter_->set_enabled(cfg.get_bool("reporting.enabled", false));
 
+    // Initialize alert manager
+    alert_manager_ = std::make_unique<alert::AlertManager>();
+    if (cfg.get_bool("alert.enabled", true)) {
+        // Add default alert rules
+        alert_manager_->add_rule(alert::rules::high_cpu_usage());
+        alert_manager_->add_rule(alert::rules::suspicious_process());
+        alert_manager_->add_rule(alert::rules::critical_file_change());
+        alert_manager_->add_rule(alert::rules::network_anomaly());
+        alert_manager_->add_rule(alert::rules::config_tampering());
+        alert_manager_->add_rule(alert::rules::rapid_file_changes());
+        COS_LOG_INFO("Alert manager initialized with default rules");
+    }
+
+    // Initialize event filter
+    event_filter_ = std::make_unique<filter::EventFilter>();
+    if (cfg.get_bool("filter.enabled", false)) {
+        // Add default filter rules
+        event_filter_->add_rule(filter::rules::ignore_temp_files());
+        event_filter_->add_rule(filter::rules::ignore_log_files());
+        event_filter_->add_rule(filter::rules::ignore_browser_cache());
+        COS_LOG_INFO("Event filter initialized with default rules");
+    }
+
+    // Initialize statistics collector
+    statistics_ = std::make_unique<stats::StatisticsCollector>();
+    COS_LOG_INFO("Statistics collector initialized");
+
     auto route = [this](const Event& e) { route_event(e); };
     fs_->on_event(route);
     proc_->on_event(route);
@@ -93,12 +120,30 @@ void MonitorEngine::on_event(EventCallback cb) {
 }
 
 void MonitorEngine::route_event(const Event& event) {
-    if (storage_) storage_->insert(event);
-    if (reporter_ && reporter_->enabled()) reporter_->enqueue(event);
+    // Apply event filter
+    Event filtered_event = event;
+    if (event_filter_ && !event_filter_->process(filtered_event)) {
+        // Event was filtered out
+        return;
+    }
+
+    // Record statistics
+    if (statistics_) {
+        statistics_->record(filtered_event);
+    }
+
+    // Process alerts
+    if (alert_manager_) {
+        alert_manager_->process_event(filtered_event);
+    }
+
+    // Store event
+    if (storage_) storage_->insert(filtered_event);
+    if (reporter_ && reporter_->enabled()) reporter_->enqueue(filtered_event);
 
     {
         std::lock_guard<std::mutex> lock(recent_mutex_);
-        recent_.push_back(event);
+        recent_.push_back(filtered_event);
         if (recent_.size() > 5000) recent_.erase(recent_.begin(),
                                                  recent_.end() - 5000);
     }
@@ -109,7 +154,7 @@ void MonitorEngine::route_event(const Event& event) {
         snapshot = callbacks_;
     }
     for (auto& cb : snapshot) {
-        try { cb(event); } catch (...) {}
+        try { cb(filtered_event); } catch (...) {}
     }
 }
 
@@ -120,6 +165,9 @@ monitor::SystemConfigMonitor& MonitorEngine::system_config_monitor() { return *c
 
 storage::Storage* MonitorEngine::storage() { return storage_.get(); }
 reporting::Reporter* MonitorEngine::reporter() { return reporter_.get(); }
+alert::AlertManager* MonitorEngine::alert_manager() { return alert_manager_.get(); }
+filter::EventFilter* MonitorEngine::event_filter() { return event_filter_.get(); }
+stats::StatisticsCollector* MonitorEngine::statistics() { return statistics_.get(); }
 
 std::vector<Event> MonitorEngine::recent_events(int limit) const {
     std::lock_guard<std::mutex> lock(recent_mutex_);

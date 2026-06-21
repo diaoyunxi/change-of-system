@@ -45,3 +45,34 @@ reporting.endpoint = https://example.com/api/events
 reporting.api_key =
 reporting.batch_size = 100
 reporting.interval_ms = 10000
+
+# ------------------------------
+# Alert system
+# ------------------------------
+# Enable/disable alert system
+alert.enabled = true
+
+# Predefined alert rules are loaded by default:
+# - high_cpu_usage: Triggered when process uses high CPU
+# - suspicious_process: Detects suspicious process activity
+# - critical_file_change: Monitors critical system files
+# - network_anomaly: Detects unusual network activity
+# - config_tampering: Monitors system configuration changes
+# - rapid_file_changes: Detects rapid file modifications
+
+# ------------------------------
+# Event filter
+# ------------------------------
+# Enable/disable event filtering
+filter.enabled = false
+
+# Predefined filter rules (when filter.enabled = true):
+# - ignore_temp_files: Ignore events in /tmp directory
+# - ignore_log_files: Ignore log file changes
+# - ignore_browser_cache: Ignore browser cache changes
+
+# ------------------------------
+# Statistics
+# ------------------------------
+# Statistics are always collected and available via API
+# No configuration needed

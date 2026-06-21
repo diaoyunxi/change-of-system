@@ -10,6 +10,9 @@ set(COS_CORE_SOURCES
     monitor/process/process_monitor.cpp
     monitor/network/network_monitor.cpp
     monitor/system_config/system_config_monitor.cpp
+    alert/alert_manager.cpp
+    filter/event_filter.cpp
+    stats/statistics.cpp
 )
 
 add_library(cos_core STATIC ${COS_CORE_SOURCES})

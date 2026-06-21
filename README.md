@@ -19,6 +19,44 @@ to graph.
 | Network     | TCP/UDP connection opened / closed           |
 | System      | Config file hash change (/etc/hosts, /etc/resolv.conf, …) |
 
+## Features
+
+### Core Monitoring
+- **Filesystem Monitor**: Track file creations, modifications, deletions, and permission changes
+- **Process Monitor**: Monitor process starts, stops, CPU spikes, and memory spikes
+- **Network Monitor**: Track TCP/UDP connections and bandwidth usage
+- **System Config Monitor**: Detect configuration file changes
+
+### Alert System
+- Rule-based alerting with customizable conditions
+- Support for threshold-based triggers (e.g., alert after N events in time window)
+- Configurable cooldown periods to prevent alert spam
+- Multiple severity levels: Info, Warning, Critical, Emergency
+- Predefined alert rules for common scenarios:
+  - High CPU usage detection
+  - Suspicious process detection
+  - Critical file change monitoring
+  - Network anomaly detection
+  - Configuration tampering alerts
+  - Rapid file change detection
+
+### Event Filtering
+- Reduce noise with configurable filter rules
+- Support for regex patterns on source, target, and summary fields
+- Filter actions: Allow, Deny, or Modify events
+- Predefined filters for common use cases:
+  - Ignore temporary files
+  - Ignore log file changes
+  - Ignore browser cache directories
+  - Ignore localhost connections
+
+### Statistics & Analytics
+- Real-time event statistics collection
+- Time-series data for trend analysis
+- Top sources and targets tracking
+- Event rate calculations (events per second/minute)
+- JSON export for integration with external tools
+
 ## Architecture
 
 ```
@@ -38,6 +76,24 @@ to graph.
         │(SQLite/ │  │ (HTTP)   │  │ / CLI     │
         │ File)   │  └──────────┘  └───────────┘
         └─────────┘
+             │
+             ▼
+        ┌─────────────┐
+        │   Alert     │
+        │  Manager    │
+        └─────────────┘
+             │
+             ▼
+        ┌─────────────┐
+        │   Event     │
+        │   Filter    │
+        └─────────────┘
+             │
+             ▼
+        ┌─────────────┐
+        │ Statistics  │
+        │ Collector   │
+        └─────────────┘
 ```
 
 - Each `Monitor` subclass is a polling (or, where available, native-event)
@@ -52,6 +108,10 @@ to graph.
   without touching any monitoring code.
 - The reporting backend serializes batches to JSON and POSTs them to a
   user-configured HTTP endpoint.
+- The alert manager processes events against configurable rules and triggers
+  alerts when conditions are met.
+- The event filter allows fine-grained control over which events are processed.
+- The statistics collector aggregates event data for analysis and reporting.
 
 ## Building
 
@@ -113,6 +173,12 @@ reporting.endpoint = https://example.com/api/events
 reporting.api_key =
 reporting.batch_size = 100
 reporting.interval_ms = 10000
+
+# Alert system (enabled by default)
+alert.enabled = true
+
+# Event filter (disabled by default)
+filter.enabled = false
 ```
 
 Events are printed to stdout and persisted to `storage.database_path`. Press
@@ -146,6 +212,9 @@ src/
     system_config/
   storage/           Storage interface + default file/SQLite backend
   reporting/         HTTP batch reporter (JSON)
+  alert/             Alert system with rule-based triggers
+  filter/            Event filtering engine
+  stats/             Statistics collection and analysis
   gui/               Qt5 dashboard
   config/            Simple INI-style config store
   platform/          OS/arch detection
