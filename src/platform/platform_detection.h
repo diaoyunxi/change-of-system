@@ -30,6 +30,8 @@ bool is_unix();
 bool is_mobile();
 bool has_native_filesystem_watcher();
 bool has_native_process_monitor();
+bool has_native_user_monitor();
+bool has_native_service_monitor();
 
 } // namespace platform
 } // namespace changeos

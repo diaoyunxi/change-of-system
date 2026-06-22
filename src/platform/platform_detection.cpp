@@ -165,5 +165,17 @@ bool has_native_process_monitor() {
         || t == Type::ChromeOS || t == Type::FydeOS;
 }
 
+bool has_native_user_monitor() {
+    Type t = current();
+    return t == Type::Linux || t == Type::macOS || t == Type::UnixLike
+        || t == Type::ChromeOS || t == Type::FydeOS;
+}
+
+bool has_native_service_monitor() {
+    Type t = current();
+    return t == Type::Linux || t == Type::macOS || t == Type::Windows
+        || t == Type::ChromeOS || t == Type::FydeOS;
+}
+
 } // namespace platform
 } // namespace changeos

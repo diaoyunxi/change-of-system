@@ -10,6 +10,9 @@ set(COS_CORE_SOURCES
     monitor/process/process_monitor.cpp
     monitor/network/network_monitor.cpp
     monitor/system_config/system_config_monitor.cpp
+    monitor/user_activity/user_activity_monitor.cpp
+    monitor/service/service_monitor.cpp
+    monitor/file_integrity/file_integrity_monitor.cpp
     alert/alert_manager.cpp
     filter/event_filter.cpp
     stats/statistics.cpp
@@ -27,6 +30,12 @@ set_target_properties(cos_core PROPERTIES
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(cos_core PUBLIC pthread)
+    find_package(OpenSSL REQUIRED)
+    target_link_libraries(cos_core PUBLIC OpenSSL::SSL OpenSSL::Crypto)
+endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    target_link_libraries(cos_core PUBLIC "-framework Security")
 endif()
 
 add_executable(change-of-system main.cpp)

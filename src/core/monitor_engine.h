@@ -19,6 +19,9 @@ class FilesystemMonitor;
 class ProcessMonitor;
 class NetworkMonitor;
 class SystemConfigMonitor;
+class UserActivityMonitor;
+class ServiceMonitor;
+class FileIntegrityMonitor;
 }
 
 namespace storage {
@@ -47,6 +50,9 @@ public:
     monitor::ProcessMonitor& process_monitor();
     monitor::NetworkMonitor& network_monitor();
     monitor::SystemConfigMonitor& system_config_monitor();
+    monitor::UserActivityMonitor& user_activity_monitor();
+    monitor::ServiceMonitor& service_monitor();
+    monitor::FileIntegrityMonitor& file_integrity_monitor();
 
     storage::Storage* storage();
     reporting::Reporter* reporter();
@@ -63,6 +69,9 @@ private:
     std::unique_ptr<monitor::ProcessMonitor> proc_;
     std::unique_ptr<monitor::NetworkMonitor> net_;
     std::unique_ptr<monitor::SystemConfigMonitor> cfg_;
+    std::unique_ptr<monitor::UserActivityMonitor> user_;
+    std::unique_ptr<monitor::ServiceMonitor> service_;
+    std::unique_ptr<monitor::FileIntegrityMonitor> integrity_;
 
     std::unique_ptr<storage::Storage> storage_;
     std::unique_ptr<reporting::Reporter> reporter_;

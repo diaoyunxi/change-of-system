@@ -32,6 +32,26 @@ system_config.enabled = true
 system_config.poll_interval_ms = 10000
 
 # ------------------------------
+# User activity monitor
+# ------------------------------
+user_activity.enabled = true
+user_activity.poll_interval_ms = 5000
+
+# ------------------------------
+# Service monitor
+# ------------------------------
+service.enabled = true
+service.poll_interval_ms = 10000
+
+# ------------------------------
+# File integrity monitor
+# ------------------------------
+file_integrity.enabled = true
+file_integrity.poll_interval_ms = 30000
+# Comma-separated list of files to monitor for integrity changes
+file_integrity.watch_files = /etc/passwd, /etc/shadow, /etc/sudoers
+
+# ------------------------------
 # Storage
 # ------------------------------
 storage.database_path = change-of-system.log

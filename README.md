@@ -15,9 +15,12 @@ to graph.
 | Category    | Events                                      |
 |-------------|---------------------------------------------|
 | Filesystem  | File created / modified / deleted / permission changed (per-path or recursive) |
-| Process     | Process started / stopped                    |
-| Network     | TCP/UDP connection opened / closed           |
+| Process     | Process started / stopped / CPU spike / memory spike |
+| Network     | TCP/UDP connection opened / closed / bandwidth spike / DNS query |
 | System      | Config file hash change (/etc/hosts, /etc/resolv.conf, …) |
+| User        | User login / logout activity                |
+| Service     | System service state changes (running/stopped/failed) |
+| Integrity   | File integrity verification using SHA-256 hashing |
 
 ## Features
 
@@ -26,6 +29,9 @@ to graph.
 - **Process Monitor**: Monitor process starts, stops, CPU spikes, and memory spikes
 - **Network Monitor**: Track TCP/UDP connections and bandwidth usage
 - **System Config Monitor**: Detect configuration file changes
+- **User Activity Monitor**: Track user login/logout events and session information
+- **Service Monitor**: Monitor systemd service state changes (running/stopped/failed)
+- **File Integrity Monitor**: Verify file integrity using SHA-256 hashing
 
 ### Alert System
 - Rule-based alerting with customizable conditions
@@ -165,6 +171,16 @@ network.poll_interval_ms = 5000
 system_config.enabled = true
 system_config.poll_interval_ms = 10000
 
+user_activity.enabled = true
+user_activity.poll_interval_ms = 5000
+
+service.enabled = true
+service.poll_interval_ms = 10000
+
+file_integrity.enabled = true
+file_integrity.poll_interval_ms = 30000
+file_integrity.watch_files = /etc/passwd, /etc/shadow, /etc/sudoers
+
 storage.database_path = change-of-system.log
 storage.max_events = 100000
 
@@ -210,6 +226,9 @@ src/
     process/
     network/
     system_config/
+    user_activity/   User login/logout activity monitoring
+    service/         Systemd service state monitoring
+    file_integrity/  SHA-256 file integrity verification
   storage/           Storage interface + default file/SQLite backend
   reporting/         HTTP batch reporter (JSON)
   alert/             Alert system with rule-based triggers

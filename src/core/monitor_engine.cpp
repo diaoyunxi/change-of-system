@@ -5,6 +5,9 @@
 #include "monitor/network/network_monitor.h"
 #include "monitor/process/process_monitor.h"
 #include "monitor/system_config/system_config_monitor.h"
+#include "monitor/user_activity/user_activity_monitor.h"
+#include "monitor/service/service_monitor.h"
+#include "monitor/file_integrity/file_integrity_monitor.h"
 #include "reporting/reporter.h"
 #include "storage/storage.h"
 #include "utils/logger.h"
@@ -24,19 +27,31 @@ bool MonitorEngine::initialize(const std::string& config_path) {
     proc_ = std::make_unique<monitor::ProcessMonitor>();
     net_ = std::make_unique<monitor::NetworkMonitor>();
     cfg_ = std::make_unique<monitor::SystemConfigMonitor>();
+    user_ = std::make_unique<monitor::UserActivityMonitor>();
+    service_ = std::make_unique<monitor::ServiceMonitor>();
+    integrity_ = std::make_unique<monitor::FileIntegrityMonitor>();
 
     int fs_interval = cfg.get_int("filesystem.poll_interval_ms", 3000);
     int proc_interval = cfg.get_int("process.poll_interval_ms", 3000);
     int net_interval = cfg.get_int("network.poll_interval_ms", 5000);
     int sys_interval = cfg.get_int("system_config.poll_interval_ms", 10000);
+    int user_interval = cfg.get_int("user_activity.poll_interval_ms", 5000);
+    int service_interval = cfg.get_int("service.poll_interval_ms", 10000);
+    int integrity_interval = cfg.get_int("file_integrity.poll_interval_ms", 30000);
 
     fs_->set_poll_interval_ms(fs_interval);
     proc_->set_poll_interval_ms(proc_interval);
     net_->set_poll_interval_ms(net_interval);
     cfg_->set_poll_interval_ms(sys_interval);
+    user_->set_poll_interval_ms(user_interval);
+    service_->set_poll_interval_ms(service_interval);
+    integrity_->set_poll_interval_ms(integrity_interval);
 
     auto watch_paths = cfg.get_list("filesystem.watch_paths", {"/tmp"});
     for (auto& p : watch_paths) fs_->add_watch_path(p);
+
+    auto integrity_files = cfg.get_list("file_integrity.watch_files", {});
+    for (auto& f : integrity_files) integrity_->add_watch_file(f);
 
     storage_ = storage::create_sqlite_storage();
     std::string storage_path = cfg.get("storage.database_path",
@@ -87,6 +102,9 @@ bool MonitorEngine::initialize(const std::string& config_path) {
     proc_->on_event(route);
     net_->on_event(route);
     cfg_->on_event(route);
+    user_->on_event(route);
+    service_->on_event(route);
+    integrity_->on_event(route);
 
     return true;
 }
@@ -98,6 +116,9 @@ bool MonitorEngine::start_all() {
     if (proc_ && proc_->is_available()) proc_->start();
     if (net_ && net_->is_available()) net_->start();
     if (cfg_ && cfg_->is_available()) cfg_->start();
+    if (user_ && user_->is_available()) user_->start();
+    if (service_ && service_->is_available()) service_->start();
+    if (integrity_ && integrity_->is_available()) integrity_->start();
     if (reporter_) reporter_->start();
     return true;
 }
@@ -109,6 +130,9 @@ bool MonitorEngine::stop_all() {
     if (proc_) proc_->stop();
     if (net_) net_->stop();
     if (cfg_) cfg_->stop();
+    if (user_) user_->stop();
+    if (service_) service_->stop();
+    if (integrity_) integrity_->stop();
     if (reporter_) reporter_->stop();
     if (storage_) storage_->close();
     return true;
@@ -162,6 +186,9 @@ monitor::FilesystemMonitor& MonitorEngine::filesystem_monitor() { return *fs_; }
 monitor::ProcessMonitor& MonitorEngine::process_monitor() { return *proc_; }
 monitor::NetworkMonitor& MonitorEngine::network_monitor() { return *net_; }
 monitor::SystemConfigMonitor& MonitorEngine::system_config_monitor() { return *cfg_; }
+monitor::UserActivityMonitor& MonitorEngine::user_activity_monitor() { return *user_; }
+monitor::ServiceMonitor& MonitorEngine::service_monitor() { return *service_; }
+monitor::FileIntegrityMonitor& MonitorEngine::file_integrity_monitor() { return *integrity_; }
 
 storage::Storage* MonitorEngine::storage() { return storage_.get(); }
 reporting::Reporter* MonitorEngine::reporter() { return reporter_.get(); }
