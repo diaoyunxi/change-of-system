@@ -24,6 +24,8 @@ enum class EventCategory {
     Process,
     Network,
     SystemConfig,
+    Hardware,      // USB and other hardware events
+    System,        // System-level metrics (disk, load)
     Unknown
 };
 
@@ -48,6 +50,17 @@ enum class EventType {
     ServiceStateChanged,
     UserLoggedIn,
     UserLoggedOut,
+
+    // Hardware events
+    UsbDeviceInserted,
+    UsbDeviceRemoved,
+
+    // System events
+    DiskSpaceWarning,
+    DiskSpaceCritical,
+    DiskSpaceChanged,
+    SystemLoadHigh,
+    SystemLoadNormal,
 
     Unknown
 };

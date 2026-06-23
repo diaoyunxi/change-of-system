@@ -144,6 +144,16 @@ int ConfigStore::get_int(const std::string& key, int default_value) const {
     }
 }
 
+double ConfigStore::get_double(const std::string& key, double default_value) const {
+    std::string v = get(key);
+    if (v.empty()) return default_value;
+    try {
+        return std::stod(v);
+    } catch (...) {
+        return default_value;
+    }
+}
+
 bool ConfigStore::get_bool(const std::string& key, bool default_value) const {
     std::string v = get(key);
     if (v.empty()) return default_value;

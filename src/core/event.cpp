@@ -8,6 +8,8 @@ std::string category_name(EventCategory c) {
         case EventCategory::Process: return "process";
         case EventCategory::Network: return "network";
         case EventCategory::SystemConfig: return "system_config";
+        case EventCategory::Hardware: return "hardware";
+        case EventCategory::System: return "system";
         default: return "unknown";
     }
 }
@@ -34,6 +36,15 @@ std::string type_name(EventType t) {
         case EventType::ServiceStateChanged: return "service_state_changed";
         case EventType::UserLoggedIn: return "user_logged_in";
         case EventType::UserLoggedOut: return "user_logged_out";
+
+        case EventType::UsbDeviceInserted: return "usb_device_inserted";
+        case EventType::UsbDeviceRemoved: return "usb_device_removed";
+
+        case EventType::DiskSpaceWarning: return "disk_space_warning";
+        case EventType::DiskSpaceCritical: return "disk_space_critical";
+        case EventType::DiskSpaceChanged: return "disk_space_changed";
+        case EventType::SystemLoadHigh: return "system_load_high";
+        case EventType::SystemLoadNormal: return "system_load_normal";
 
         default: return "unknown";
     }
@@ -65,6 +76,17 @@ EventCategory category_of(EventType t) {
         case EventType::UserLoggedIn:
         case EventType::UserLoggedOut:
             return EventCategory::SystemConfig;
+
+        case EventType::UsbDeviceInserted:
+        case EventType::UsbDeviceRemoved:
+            return EventCategory::Hardware;
+
+        case EventType::DiskSpaceWarning:
+        case EventType::DiskSpaceCritical:
+        case EventType::DiskSpaceChanged:
+        case EventType::SystemLoadHigh:
+        case EventType::SystemLoadNormal:
+            return EventCategory::System;
 
         default:
             return EventCategory::Unknown;

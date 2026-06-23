@@ -13,6 +13,9 @@ set(COS_CORE_SOURCES
     monitor/user_activity/user_activity_monitor.cpp
     monitor/service/service_monitor.cpp
     monitor/file_integrity/file_integrity_monitor.cpp
+    monitor/usb_device/usb_device_monitor.cpp
+    monitor/disk_space/disk_space_monitor.cpp
+    monitor/system_load/system_load_monitor.cpp
     alert/alert_manager.cpp
     filter/event_filter.cpp
     stats/statistics.cpp

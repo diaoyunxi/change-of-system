@@ -8,6 +8,9 @@
 #include "monitor/user_activity/user_activity_monitor.h"
 #include "monitor/service/service_monitor.h"
 #include "monitor/file_integrity/file_integrity_monitor.h"
+#include "monitor/usb_device/usb_device_monitor.h"
+#include "monitor/disk_space/disk_space_monitor.h"
+#include "monitor/system_load/system_load_monitor.h"
 #include "reporting/reporter.h"
 #include "storage/storage.h"
 #include "utils/logger.h"
@@ -30,6 +33,9 @@ bool MonitorEngine::initialize(const std::string& config_path) {
     user_ = std::make_unique<monitor::UserActivityMonitor>();
     service_ = std::make_unique<monitor::ServiceMonitor>();
     integrity_ = std::make_unique<monitor::FileIntegrityMonitor>();
+    usb_ = std::make_unique<monitor::UsbDeviceMonitor>();
+    disk_ = std::make_unique<monitor::DiskSpaceMonitor>();
+    load_ = std::make_unique<monitor::SystemLoadMonitor>();
 
     int fs_interval = cfg.get_int("filesystem.poll_interval_ms", 3000);
     int proc_interval = cfg.get_int("process.poll_interval_ms", 3000);
@@ -38,6 +44,9 @@ bool MonitorEngine::initialize(const std::string& config_path) {
     int user_interval = cfg.get_int("user_activity.poll_interval_ms", 5000);
     int service_interval = cfg.get_int("service.poll_interval_ms", 10000);
     int integrity_interval = cfg.get_int("file_integrity.poll_interval_ms", 30000);
+    int usb_interval = cfg.get_int("usb_device.poll_interval_ms", 5000);
+    int disk_interval = cfg.get_int("disk_space.poll_interval_ms", 30000);
+    int load_interval = cfg.get_int("system_load.poll_interval_ms", 5000);
 
     fs_->set_poll_interval_ms(fs_interval);
     proc_->set_poll_interval_ms(proc_interval);
@@ -46,12 +55,23 @@ bool MonitorEngine::initialize(const std::string& config_path) {
     user_->set_poll_interval_ms(user_interval);
     service_->set_poll_interval_ms(service_interval);
     integrity_->set_poll_interval_ms(integrity_interval);
+    usb_->set_poll_interval_ms(usb_interval);
+    disk_->set_poll_interval_ms(disk_interval);
+    load_->set_poll_interval_ms(load_interval);
 
     auto watch_paths = cfg.get_list("filesystem.watch_paths", {"/tmp"});
     for (auto& p : watch_paths) fs_->add_watch_path(p);
 
     auto integrity_files = cfg.get_list("file_integrity.watch_files", {});
     for (auto& f : integrity_files) integrity_->add_watch_file(f);
+
+    auto disk_paths = cfg.get_list("disk_space.watch_paths", {});
+    disk_->set_watch_paths(disk_paths);
+    disk_->set_warning_threshold(cfg.get_double("disk_space.warning_threshold", 80.0));
+    disk_->set_critical_threshold(cfg.get_double("disk_space.critical_threshold", 95.0));
+
+    load_->set_load_threshold(cfg.get_double("system_load.load_threshold", 5.0));
+    load_->set_cpu_threshold(cfg.get_double("system_load.cpu_threshold", 90.0));
 
     storage_ = storage::create_sqlite_storage();
     std::string storage_path = cfg.get("storage.database_path",
@@ -105,6 +125,9 @@ bool MonitorEngine::initialize(const std::string& config_path) {
     user_->on_event(route);
     service_->on_event(route);
     integrity_->on_event(route);
+    usb_->on_event(route);
+    disk_->on_event(route);
+    load_->on_event(route);
 
     return true;
 }
@@ -119,6 +142,9 @@ bool MonitorEngine::start_all() {
     if (user_ && user_->is_available()) user_->start();
     if (service_ && service_->is_available()) service_->start();
     if (integrity_ && integrity_->is_available()) integrity_->start();
+    if (usb_ && usb_->is_available()) usb_->start();
+    if (disk_ && disk_->is_available()) disk_->start();
+    if (load_ && load_->is_available()) load_->start();
     if (reporter_) reporter_->start();
     return true;
 }
@@ -133,6 +159,9 @@ bool MonitorEngine::stop_all() {
     if (user_) user_->stop();
     if (service_) service_->stop();
     if (integrity_) integrity_->stop();
+    if (usb_) usb_->stop();
+    if (disk_) disk_->stop();
+    if (load_) load_->stop();
     if (reporter_) reporter_->stop();
     if (storage_) storage_->close();
     return true;
@@ -189,6 +218,9 @@ monitor::SystemConfigMonitor& MonitorEngine::system_config_monitor() { return *c
 monitor::UserActivityMonitor& MonitorEngine::user_activity_monitor() { return *user_; }
 monitor::ServiceMonitor& MonitorEngine::service_monitor() { return *service_; }
 monitor::FileIntegrityMonitor& MonitorEngine::file_integrity_monitor() { return *integrity_; }
+monitor::UsbDeviceMonitor& MonitorEngine::usb_device_monitor() { return *usb_; }
+monitor::DiskSpaceMonitor& MonitorEngine::disk_space_monitor() { return *disk_; }
+monitor::SystemLoadMonitor& MonitorEngine::system_load_monitor() { return *load_; }
 
 storage::Storage* MonitorEngine::storage() { return storage_.get(); }
 reporting::Reporter* MonitorEngine::reporter() { return reporter_.get(); }

@@ -22,6 +22,9 @@ class SystemConfigMonitor;
 class UserActivityMonitor;
 class ServiceMonitor;
 class FileIntegrityMonitor;
+class UsbDeviceMonitor;
+class DiskSpaceMonitor;
+class SystemLoadMonitor;
 }
 
 namespace storage {
@@ -53,6 +56,9 @@ public:
     monitor::UserActivityMonitor& user_activity_monitor();
     monitor::ServiceMonitor& service_monitor();
     monitor::FileIntegrityMonitor& file_integrity_monitor();
+    monitor::UsbDeviceMonitor& usb_device_monitor();
+    monitor::DiskSpaceMonitor& disk_space_monitor();
+    monitor::SystemLoadMonitor& system_load_monitor();
 
     storage::Storage* storage();
     reporting::Reporter* reporter();
@@ -72,6 +78,9 @@ private:
     std::unique_ptr<monitor::UserActivityMonitor> user_;
     std::unique_ptr<monitor::ServiceMonitor> service_;
     std::unique_ptr<monitor::FileIntegrityMonitor> integrity_;
+    std::unique_ptr<monitor::UsbDeviceMonitor> usb_;
+    std::unique_ptr<monitor::DiskSpaceMonitor> disk_;
+    std::unique_ptr<monitor::SystemLoadMonitor> load_;
 
     std::unique_ptr<storage::Storage> storage_;
     std::unique_ptr<reporting::Reporter> reporter_;

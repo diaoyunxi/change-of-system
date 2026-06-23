@@ -21,6 +21,9 @@ to graph.
 | User        | User login / logout activity                |
 | Service     | System service state changes (running/stopped/failed) |
 | Integrity   | File integrity verification using SHA-256 hashing |
+| USB         | USB device inserted / removed               |
+| Disk        | Disk space warning / critical / changed     |
+| Load        | System load high / normal (CPU & memory)    |
 
 ## Features
 
@@ -32,6 +35,9 @@ to graph.
 - **User Activity Monitor**: Track user login/logout events and session information
 - **Service Monitor**: Monitor systemd service state changes (running/stopped/failed)
 - **File Integrity Monitor**: Verify file integrity using SHA-256 hashing
+- **USB Device Monitor**: Detect USB device insertion and removal events
+- **Disk Space Monitor**: Monitor disk usage with configurable warning/critical thresholds
+- **System Load Monitor**: Track system load averages, CPU usage, and memory usage
 
 ### Alert System
 - Rule-based alerting with customizable conditions
@@ -66,21 +72,21 @@ to graph.
 ## Architecture
 
 ```
-┌────────────┐   ┌────────────┐   ┌────────────┐
-│ Filesystem │   │  Process   │   │  Network   │ ... (Monitor)
-│  Monitor   │   │  Monitor   │   │  Monitor   │
-└────┬───────┘   └─────┬──────┘   └─────┬──────┘
-     │                 │                │
-     └─────────┬───────┘                │
-               ▼                        ▼
-          ┌─────────────────────────────────────┐
-          │         MonitorEngine               │  ← routes events
-          └──┬─────────────┬─────────────┬─────┘
-             ▼             ▼             ▼
-        ┌─────────┐  ┌──────────┐  ┌───────────┐
-        │ Storage │  │ Reporter │  │  Qt GUI   │
-        │(SQLite/ │  │ (HTTP)   │  │ / CLI     │
-        │ File)   │  └──────────┘  └───────────┘
+┌────────────┐   ┌────────────┐   ┌────────────┐   ┌────────────┐
+│ Filesystem │   │  Process   │   │  Network   │   │    USB     │ ... (Monitor)
+│  Monitor   │   │  Monitor   │   │  Monitor   │   │  Monitor   │
+└────┬───────┘   └─────┬──────┘   └─────┬──────┘   └─────┬──────┘
+     │                 │                │                │
+     └─────────┬───────┘                │                │
+               ▼                        ▼                ▼
+          ┌─────────────────────────────────────────────────────┐
+          │                   MonitorEngine                      │  ← routes events
+          └──┬─────────────┬─────────────┬─────────────┬───────┘
+             ▼             ▼             ▼             ▼
+        ┌─────────┐  ┌──────────┐  ┌───────────┐  ┌───────────┐
+        │ Storage │  │ Reporter │  │  Qt GUI   │  │ Statistics│
+        │(SQLite/ │  │ (HTTP)   │  │ / CLI     │  │ Collector │
+        │ File)   │  └──────────┘  └───────────┘  └───────────┘
         └─────────┘
              │
              ▼
@@ -93,12 +99,6 @@ to graph.
         ┌─────────────┐
         │   Event     │
         │   Filter    │
-        └─────────────┘
-             │
-             ▼
-        ┌─────────────┐
-        │ Statistics  │
-        │ Collector   │
         └─────────────┘
 ```
 
@@ -181,6 +181,19 @@ file_integrity.enabled = true
 file_integrity.poll_interval_ms = 30000
 file_integrity.watch_files = /etc/passwd, /etc/shadow, /etc/sudoers
 
+usb_device.enabled = true
+usb_device.poll_interval_ms = 5000
+
+disk_space.enabled = true
+disk_space.poll_interval_ms = 30000
+disk_space.warning_threshold = 80.0
+disk_space.critical_threshold = 95.0
+
+system_load.enabled = true
+system_load.poll_interval_ms = 5000
+system_load.load_threshold = 5.0
+system_load.cpu_threshold = 90.0
+
 storage.database_path = change-of-system.log
 storage.max_events = 100000
 
@@ -229,6 +242,9 @@ src/
     user_activity/   User login/logout activity monitoring
     service/         Systemd service state monitoring
     file_integrity/  SHA-256 file integrity verification
+    usb_device/      USB device insertion/removal monitoring
+    disk_space/      Disk space usage monitoring
+    system_load/     System load and CPU/memory monitoring
   storage/           Storage interface + default file/SQLite backend
   reporting/         HTTP batch reporter (JSON)
   alert/             Alert system with rule-based triggers

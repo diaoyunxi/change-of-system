@@ -52,6 +52,34 @@ file_integrity.poll_interval_ms = 30000
 file_integrity.watch_files = /etc/passwd, /etc/shadow, /etc/sudoers
 
 # ------------------------------
+# USB device monitor
+# ------------------------------
+usb_device.enabled = true
+usb_device.poll_interval_ms = 5000
+
+# ------------------------------
+# Disk space monitor
+# ------------------------------
+disk_space.enabled = true
+disk_space.poll_interval_ms = 30000
+# Comma-separated list of mount points to watch (empty = all)
+disk_space.watch_paths =
+# Warning threshold (percentage)
+disk_space.warning_threshold = 80.0
+# Critical threshold (percentage)
+disk_space.critical_threshold = 95.0
+
+# ------------------------------
+# System load monitor
+# ------------------------------
+system_load.enabled = true
+system_load.poll_interval_ms = 5000
+# High load threshold (1-minute load average)
+system_load.load_threshold = 5.0
+# High CPU usage threshold (percentage)
+system_load.cpu_threshold = 90.0
+
+# ------------------------------
 # Storage
 # ------------------------------
 storage.database_path = change-of-system.log

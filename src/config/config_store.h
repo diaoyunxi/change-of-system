@@ -21,6 +21,7 @@ public:
     std::string get(const std::string& key,
                     const std::string& default_value = {}) const;
     int get_int(const std::string& key, int default_value = 0) const;
+    double get_double(const std::string& key, double default_value = 0.0) const;
     bool get_bool(const std::string& key, bool default_value = false) const;
     std::vector<std::string> get_list(const std::string& key,
         const std::vector<std::string>& default_value = {}) const;
