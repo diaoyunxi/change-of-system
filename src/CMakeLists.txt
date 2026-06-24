@@ -3,6 +3,7 @@ set(COS_CORE_SOURCES
     core/monitor.cpp
     core/monitor_engine.cpp
     platform/platform_detection.cpp
+    platform/privilege.cpp
     config/config_store.cpp
     storage/storage.cpp
     reporting/reporter.cpp
