@@ -24,6 +24,8 @@ to graph.
 | USB         | USB device inserted / removed               |
 | Disk        | Disk space warning / critical / changed     |
 | Load        | System load high / normal (CPU & memory)    |
+| Log         | Log pattern matches / anomalies detected    |
+| Security    | Security events (failed login, privilege escalation, suspicious activity) |
 
 ## Features
 
@@ -38,6 +40,7 @@ to graph.
 - **USB Device Monitor**: Detect USB device insertion and removal events
 - **Disk Space Monitor**: Monitor disk usage with configurable warning/critical thresholds
 - **System Load Monitor**: Track system load averages, CPU usage, and memory usage
+- **Log Monitor**: Monitor log files for pattern matches and anomalies with regex support
 
 ### Alert System
 - Rule-based alerting with customizable conditions
@@ -69,30 +72,50 @@ to graph.
 - Event rate calculations (events per second/minute)
 - JSON export for integration with external tools
 
+### Security Audit
+- Real-time security event detection
+- Failed login attempt tracking with threshold alerts
+- Privilege escalation monitoring
+- Sensitive file access detection
+- Suspicious process identification (netcat, nmap, etc.)
+- Network anomaly detection (suspicious outbound connections)
+- Firewall change monitoring
+- User database modification alerts
+- Predefined security rules for common attack patterns
+
+### Webhook Notifications
+- HTTP webhook integration for external alerting systems
+- Support for multiple webhook endpoints
+- HMAC signature verification for secure delivery
+- Configurable retry logic and timeouts
+- Severity-based filtering
+- JSON payload format for easy integration
+- Works with Slack, Discord, PagerDuty, custom endpoints
+
 ## Architecture
 
 ```
-┌────────────┐   ┌────────────┐   ┌────────────┐   ┌────────────┐
-│ Filesystem │   │  Process   │   │  Network   │   │    USB     │ ... (Monitor)
-│  Monitor   │   │  Monitor   │   │  Monitor   │   │  Monitor   │
-└────┬───────┘   └─────┬──────┘   └─────┬──────┘   └─────┬──────┘
-     │                 │                │                │
-     └─────────┬───────┘                │                │
-               ▼                        ▼                ▼
-          ┌─────────────────────────────────────────────────────┐
+┌────────────┐   ┌────────────┐   ┌────────────┐   ┌────────────┐   ┌────────────┐
+│ Filesystem │   │  Process   │   │  Network   │   │    USB     │   │    Log     │ ... (Monitor)
+│  Monitor   │   │  Monitor   │   │  Monitor   │   │  Monitor   │   │  Monitor   │
+└────┬───────┘   └─────┬──────┘   └─────┬──────┘   └─────┬──────┘   └─────┬──────┘
+     │                 │                │                │                │
+     └─────────┬───────┘                │                │                │
+               ▼                        ▼                ▼                ▼
+          ┌─────────────────────────────────────────────────────────────────────┐
           │                   MonitorEngine                      │  ← routes events
-          └──┬─────────────┬─────────────┬─────────────┬───────┘
-             ▼             ▼             ▼             ▼
-        ┌─────────┐  ┌──────────┐  ┌───────────┐  ┌───────────┐
-        │ Storage │  │ Reporter │  │  Qt GUI   │  │ Statistics│
-        │(SQLite/ │  │ (HTTP)   │  │ / CLI     │  │ Collector │
-        │ File)   │  └──────────┘  └───────────┘  └───────────┘
-        └─────────┘
-             │
-             ▼
-        ┌─────────────┐
-        │   Alert     │
-        │  Manager    │
+          └──┬─────────────┬─────────────┬─────────────┬─────────────┬───────────┘
+             ▼             ▼             ▼             ▼             ▼
+        ┌─────────┐  ┌──────────┐  ┌───────────┐  ┌───────────┐  ┌──────────────┐
+        │ Storage │  │ Reporter │  │  Qt GUI   │  │ Statistics│  │   Security   │
+        │(SQLite/ │  │ (HTTP)   │  │ / CLI     │  │ Collector │  │   Auditor    │
+        │ File)   │  └──────────┘  └───────────┘  └───────────┘  └──────────────┘
+        └─────────┘                                                      │
+             │                                                           ▼
+             ▼                                                      ┌──────────────┐
+        ┌─────────────┐                                              │   Webhook    │
+        │   Alert     │                                              │   Notifier   │
+        │  Manager    │                                              └──────────────┘
         └─────────────┘
              │
              ▼
@@ -118,6 +141,9 @@ to graph.
   alerts when conditions are met.
 - The event filter allows fine-grained control over which events are processed.
 - The statistics collector aggregates event data for analysis and reporting.
+- The security auditor analyzes events for security-relevant patterns and
+  generates security events.
+- The webhook notifier sends alerts and security events to external HTTP endpoints.
 
 ## Building
 
@@ -245,11 +271,14 @@ src/
     usb_device/      USB device insertion/removal monitoring
     disk_space/      Disk space usage monitoring
     system_load/     System load and CPU/memory monitoring
+    log/             Log file pattern matching and anomaly detection
   storage/           Storage interface + default file/SQLite backend
   reporting/         HTTP batch reporter (JSON)
   alert/             Alert system with rule-based triggers
   filter/            Event filtering engine
   stats/             Statistics collection and analysis
+  security/          Security audit and event detection
+  webhook/           HTTP webhook notification system
   gui/               Qt5 dashboard
   config/            Simple INI-style config store
   platform/          OS/arch detection

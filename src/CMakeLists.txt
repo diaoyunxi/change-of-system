@@ -16,9 +16,12 @@ set(COS_CORE_SOURCES
     monitor/usb_device/usb_device_monitor.cpp
     monitor/disk_space/disk_space_monitor.cpp
     monitor/system_load/system_load_monitor.cpp
+    monitor/log/log_monitor.cpp
     alert/alert_manager.cpp
     filter/event_filter.cpp
     stats/statistics.cpp
+    security/security_auditor.cpp
+    webhook/webhook_notifier.cpp
 )
 
 add_library(cos_core STATIC ${COS_CORE_SOURCES})

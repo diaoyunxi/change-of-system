@@ -62,6 +62,10 @@ enum class EventType {
     SystemLoadHigh,
     SystemLoadNormal,
 
+    // Log events
+    LogPatternMatched,
+    LogAnomalyDetected,
+
     Unknown
 };
 

@@ -124,3 +124,25 @@ filter.enabled = false
 # ------------------------------
 # Statistics are always collected and available via API
 # No configuration needed
+
+# ------------------------------
+# Log monitor
+# ------------------------------
+log.enabled = true
+log.poll_interval_ms = 5000
+# Comma-separated list of log files to watch
+log.watch_paths = /var/log/auth.log, /var/log/syslog
+
+# ------------------------------
+# Security auditor
+# ------------------------------
+security.enabled = true
+
+# ------------------------------
+# Webhook notifications
+# ------------------------------
+webhook.enabled = false
+webhook.url =
+webhook.secret =
+webhook.timeout_ms = 5000
+webhook.retry_count = 3

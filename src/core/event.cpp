@@ -46,6 +46,9 @@ std::string type_name(EventType t) {
         case EventType::SystemLoadHigh: return "system_load_high";
         case EventType::SystemLoadNormal: return "system_load_normal";
 
+        case EventType::LogPatternMatched: return "log_pattern_matched";
+        case EventType::LogAnomalyDetected: return "log_anomaly_detected";
+
         default: return "unknown";
     }
 }
@@ -86,6 +89,8 @@ EventCategory category_of(EventType t) {
         case EventType::DiskSpaceChanged:
         case EventType::SystemLoadHigh:
         case EventType::SystemLoadNormal:
+        case EventType::LogPatternMatched:
+        case EventType::LogAnomalyDetected:
             return EventCategory::System;
 
         default:

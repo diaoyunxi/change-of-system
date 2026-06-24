@@ -4,6 +4,8 @@
 #include "alert/alert_manager.h"
 #include "filter/event_filter.h"
 #include "stats/statistics.h"
+#include "security/security_auditor.h"
+#include "webhook/webhook_notifier.h"
 
 #include <atomic>
 #include <functional>
@@ -25,6 +27,7 @@ class FileIntegrityMonitor;
 class UsbDeviceMonitor;
 class DiskSpaceMonitor;
 class SystemLoadMonitor;
+class LogMonitor;
 }
 
 namespace storage {
@@ -59,12 +62,15 @@ public:
     monitor::UsbDeviceMonitor& usb_device_monitor();
     monitor::DiskSpaceMonitor& disk_space_monitor();
     monitor::SystemLoadMonitor& system_load_monitor();
+    monitor::LogMonitor& log_monitor();
 
     storage::Storage* storage();
     reporting::Reporter* reporter();
     alert::AlertManager* alert_manager();
     filter::EventFilter* event_filter();
     stats::StatisticsCollector* statistics();
+    security::SecurityAuditor* security_auditor();
+    webhook::WebhookNotifier* webhook_notifier();
 
     std::vector<Event> recent_events(int limit = 100) const;
 
@@ -81,12 +87,15 @@ private:
     std::unique_ptr<monitor::UsbDeviceMonitor> usb_;
     std::unique_ptr<monitor::DiskSpaceMonitor> disk_;
     std::unique_ptr<monitor::SystemLoadMonitor> load_;
+    std::unique_ptr<monitor::LogMonitor> log_;
 
     std::unique_ptr<storage::Storage> storage_;
     std::unique_ptr<reporting::Reporter> reporter_;
     std::unique_ptr<alert::AlertManager> alert_manager_;
     std::unique_ptr<filter::EventFilter> event_filter_;
     std::unique_ptr<stats::StatisticsCollector> statistics_;
+    std::unique_ptr<security::SecurityAuditor> security_auditor_;
+    std::unique_ptr<webhook::WebhookNotifier> webhook_notifier_;
 
     mutable std::mutex callbacks_mutex_;
     std::vector<EventCallback> callbacks_;
