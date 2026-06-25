@@ -92,6 +92,24 @@ to graph.
 - JSON payload format for easy integration
 - Works with Slack, Discord, PagerDuty, custom endpoints
 
+### Data Export
+- Export events to CSV or JSON format
+- Command-line interface for on-demand export
+- Preserves all event metadata and attributes
+- Suitable for external analysis and archiving
+
+### Report Generation
+- Generate comprehensive text reports
+- Include event summaries, statistics, and recent events
+- Configurable report sections and time periods
+- Automatic timestamp and duration formatting
+
+### Configuration Hot-Reload
+- Watch configuration file for changes
+- Automatically reload configuration without restarting
+- Update monitor intervals and settings on-the-fly
+- Configurable check interval
+
 ## Architecture
 
 ```
@@ -181,6 +199,28 @@ Headless:
 ./change-of-system --config ../config.ini
 ```
 
+Export events to file:
+
+```bash
+# Export to CSV
+./change-of-system --config config.ini --export events.csv
+
+# Export to JSON
+./change-of-system --config config.ini --export events.json
+```
+
+Generate report:
+
+```bash
+./change-of-system --config config.ini --report report.txt
+```
+
+Reload configuration:
+
+```bash
+./change-of-system --config config.ini --reload-config
+```
+
 Sample `config.ini` (see `config.ini.example` for a complete one):
 
 ```
@@ -234,6 +274,10 @@ alert.enabled = true
 
 # Event filter (disabled by default)
 filter.enabled = false
+
+# Configuration file watching (disabled by default)
+config.watch_enabled = false
+config.watch_interval_ms = 5000
 ```
 
 Events are printed to stdout and persisted to `storage.database_path`. Press
@@ -279,8 +323,10 @@ src/
   stats/             Statistics collection and analysis
   security/          Security audit and event detection
   webhook/           HTTP webhook notification system
+  export/            Event data export (CSV, JSON)
+  report/            Text report generation
   gui/               Qt5 dashboard
-  config/            Simple INI-style config store
+  config/            Simple INI-style config store + hot-reload watcher
   platform/          OS/arch detection
   utils/             Logger, periodic runner helpers
 cmake/               Platform-detection helper

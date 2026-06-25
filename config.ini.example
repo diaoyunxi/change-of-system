@@ -146,3 +146,11 @@ webhook.url =
 webhook.secret =
 webhook.timeout_ms = 5000
 webhook.retry_count = 3
+
+# ------------------------------
+# Configuration file watching
+# ------------------------------
+# Enable hot-reload of configuration file
+config.watch_enabled = false
+# Check interval in milliseconds
+config.watch_interval_ms = 5000

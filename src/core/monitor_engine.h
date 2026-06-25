@@ -6,6 +6,9 @@
 #include "stats/statistics.h"
 #include "security/security_auditor.h"
 #include "webhook/webhook_notifier.h"
+#include "export/event_exporter.h"
+#include "report/report_generator.h"
+#include "config/config_watcher.h"
 
 #include <atomic>
 #include <functional>
@@ -74,6 +77,16 @@ public:
 
     std::vector<Event> recent_events(int limit = 100) const;
 
+    // Export events to file
+    bool export_events(const std::string& output_path, export_::ExportFormat format);
+    // Generate a report
+    bool generate_report(const report::ReportConfig& config);
+    // Reload configuration
+    void reload_config();
+    // Enable config file watching
+    void enable_config_watch();
+    void disable_config_watch();
+
 private:
     void route_event(const Event& event);
 
@@ -96,6 +109,7 @@ private:
     std::unique_ptr<stats::StatisticsCollector> statistics_;
     std::unique_ptr<security::SecurityAuditor> security_auditor_;
     std::unique_ptr<webhook::WebhookNotifier> webhook_notifier_;
+    std::unique_ptr<config::ConfigWatcher> config_watcher_;
 
     mutable std::mutex callbacks_mutex_;
     std::vector<EventCallback> callbacks_;

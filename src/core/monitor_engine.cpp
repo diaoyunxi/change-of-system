@@ -168,6 +168,18 @@ bool MonitorEngine::initialize(const std::string& config_path) {
         });
     }
 
+    // Initialize config watcher
+    config_watcher_ = std::make_unique<config::ConfigWatcher>();
+    if (cfg.get_bool("config.watch_enabled", false)) {
+        int watch_interval = cfg.get_int("config.watch_interval_ms", 5000);
+        config_watcher_->start_watching(
+            config_path.empty() ? "config.ini" : config_path,
+            [this]() { reload_config(); },
+            watch_interval
+        );
+        COS_LOG_INFO("Config file watcher enabled");
+    }
+
     auto route = [this](const Event& e) { route_event(e); };
     fs_->on_event(route);
     proc_->on_event(route);
@@ -217,6 +229,7 @@ bool MonitorEngine::stop_all() {
     if (load_) load_->stop();
     if (log_) log_->stop();
     if (reporter_) reporter_->stop();
+    if (config_watcher_) config_watcher_->stop_watching();
     if (storage_) storage_->close();
     return true;
 }
@@ -295,6 +308,83 @@ std::vector<Event> MonitorEngine::recent_events(int limit) const {
     int start = static_cast<int>(recent_.size()) - limit;
     if (start < 0) start = 0;
     return std::vector<Event>(recent_.begin() + start, recent_.end());
+}
+
+bool MonitorEngine::export_events(const std::string& output_path, export_::ExportFormat format) {
+    auto events = recent_events(10000); // Export up to 10000 recent events
+    bool result = export_::EventExporter::export_events(events, output_path, format);
+    if (result) {
+        COS_LOG_INFO("Exported " + std::to_string(events.size()) + " events to " + output_path);
+    } else {
+        COS_LOG_ERROR("Failed to export events to " + output_path);
+    }
+    return result;
+}
+
+bool MonitorEngine::generate_report(const report::ReportConfig& config) {
+    auto events = recent_events(config.max_recent_events);
+    report::ReportGenerator generator(statistics_.get());
+    bool result = generator.generate_text_report(config, events);
+    if (result) {
+        COS_LOG_INFO("Generated report: " + config.output_path);
+    } else {
+        COS_LOG_ERROR("Failed to generate report: " + config.output_path);
+    }
+    return result;
+}
+
+void MonitorEngine::reload_config() {
+    auto& cfg = config::ConfigStore::instance();
+    std::string config_path = cfg.file_path();
+    
+    if (config_path.empty()) {
+        COS_LOG_WARN("Cannot reload config: no config file path");
+        return;
+    }
+    
+    COS_LOG_INFO("Reloading configuration from: " + config_path);
+    cfg.load(config_path);
+    
+    // Update poll intervals
+    fs_->set_poll_interval_ms(cfg.get_int("filesystem.poll_interval_ms", 3000));
+    proc_->set_poll_interval_ms(cfg.get_int("process.poll_interval_ms", 3000));
+    net_->set_poll_interval_ms(cfg.get_int("network.poll_interval_ms", 5000));
+    cfg_->set_poll_interval_ms(cfg.get_int("system_config.poll_interval_ms", 10000));
+    user_->set_poll_interval_ms(cfg.get_int("user_activity.poll_interval_ms", 5000));
+    service_->set_poll_interval_ms(cfg.get_int("service.poll_interval_ms", 10000));
+    integrity_->set_poll_interval_ms(cfg.get_int("file_integrity.poll_interval_ms", 30000));
+    usb_->set_poll_interval_ms(cfg.get_int("usb_device.poll_interval_ms", 5000));
+    disk_->set_poll_interval_ms(cfg.get_int("disk_space.poll_interval_ms", 30000));
+    log_->set_poll_interval_ms(cfg.get_int("log.poll_interval_ms", 5000));
+    
+    COS_LOG_INFO("Configuration reloaded successfully");
+}
+
+void MonitorEngine::enable_config_watch() {
+    if (!config_watcher_) {
+        config_watcher_ = std::make_unique<config::ConfigWatcher>();
+    }
+    
+    auto& cfg = config::ConfigStore::instance();
+    std::string config_path = cfg.file_path();
+    if (config_path.empty()) {
+        config_path = "config.ini";
+    }
+    
+    int watch_interval = cfg.get_int("config.watch_interval_ms", 5000);
+    config_watcher_->start_watching(
+        config_path,
+        [this]() { reload_config(); },
+        watch_interval
+    );
+    COS_LOG_INFO("Config file watcher enabled");
+}
+
+void MonitorEngine::disable_config_watch() {
+    if (config_watcher_) {
+        config_watcher_->stop_watching();
+        COS_LOG_INFO("Config file watcher disabled");
+    }
 }
 
 } // namespace changeos

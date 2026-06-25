@@ -4,6 +4,7 @@ set(COS_CORE_SOURCES
     core/monitor_engine.cpp
     platform/platform_detection.cpp
     config/config_store.cpp
+    config/config_watcher.cpp
     storage/storage.cpp
     reporting/reporter.cpp
     monitor/filesystem/filesystem_monitor.cpp
@@ -22,6 +23,8 @@ set(COS_CORE_SOURCES
     stats/statistics.cpp
     security/security_auditor.cpp
     webhook/webhook_notifier.cpp
+    export/event_exporter.cpp
+    report/report_generator.cpp
 )
 
 add_library(cos_core STATIC ${COS_CORE_SOURCES})
