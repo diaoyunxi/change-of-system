@@ -1,6 +1,7 @@
 #include "core/monitor_engine.h"
 #include "platform/platform_detection.h"
 #include "utils/logger.h"
+#include "utils/daemon.h"
 
 #include <atomic>
 #include <chrono>
@@ -12,15 +13,22 @@
 
 namespace {
 std::atomic<bool> g_running{true};
+std::atomic<bool> g_reload_config{false};
 
 void on_signal(int) {
     g_running.store(false);
+}
+
+void on_sighup(int) {
+    g_reload_config.store(true);
 }
 
 void print_usage(const char* prog) {
     std::cout << "Usage: " << prog << " [options]\n"
         << "Options:\n"
         << "  -c, --config <path>   Path to configuration file\n"
+        << "  -d, --daemon          Run as daemon (background)\n"
+        << "  --pid-file <path>     PID file path (default: /var/run/change-of-system.pid)\n"
         << "  --no-daemon           Run in the foreground (default)\n"
         << "  --export <path>       Export events to file (CSV or JSON)\n"
         << "  --report <path>       Generate report to file\n"
@@ -36,7 +44,9 @@ int main(int argc, char** argv) {
     std::string config_path;
     std::string export_path;
     std::string report_path;
+    std::string pid_file = "/var/run/change-of-system.pid";
     bool reload_config = false;
+    bool daemon_mode = false;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -45,6 +55,10 @@ int main(int argc, char** argv) {
             return 0;
         } else if ((arg == "-c" || arg == "--config") && i + 1 < argc) {
             config_path = argv[++i];
+        } else if ((arg == "-d" || arg == "--daemon")) {
+            daemon_mode = true;
+        } else if (arg == "--pid-file" && i + 1 < argc) {
+            pid_file = argv[++i];
         } else if (arg == "--export" && i + 1 < argc) {
             export_path = argv[++i];
         } else if (arg == "--report" && i + 1 < argc) {
@@ -54,8 +68,29 @@ int main(int argc, char** argv) {
         }
     }
 
+    // Check if already running
+    if (daemon_mode && changeos::utils::Daemon::is_already_running(pid_file)) {
+        std::cerr << "Another instance is already running (PID: " 
+                  << changeos::utils::Daemon::get_running_pid(pid_file) << ")\n";
+        return 1;
+    }
+
+    // Daemonize if requested
+    if (daemon_mode) {
+        std::cout << "Starting in daemon mode...\n";
+        if (!changeos::utils::Daemon::daemonize()) {
+            std::cerr << "Failed to daemonize\n";
+            return 1;
+        }
+        if (!changeos::utils::Daemon::write_pid_file(pid_file)) {
+            std::cerr << "Failed to write PID file\n";
+            return 1;
+        }
+    }
+
     std::signal(SIGINT, on_signal);
     std::signal(SIGTERM, on_signal);
+    std::signal(SIGHUP, on_sighup);
 
     changeos::MonitorEngine engine;
     if (!engine.initialize(config_path)) {
@@ -115,11 +150,23 @@ int main(int argc, char** argv) {
     }
 
     while (g_running.load()) {
+        // Check for SIGHUP reload request
+        if (g_reload_config.exchange(false)) {
+            std::cout << "\nReloading configuration (SIGHUP received)...\n";
+            engine.reload_config();
+            std::cout << "Configuration reloaded\n";
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 
     std::cout << "\nShutting down...\n";
     engine.stop_all();
+    
+    // Clean up PID file
+    if (daemon_mode) {
+        changeos::utils::Daemon::remove_pid_file(pid_file);
+    }
+    
     std::cout << "Stopped cleanly. Goodbye.\n";
     return 0;
 }

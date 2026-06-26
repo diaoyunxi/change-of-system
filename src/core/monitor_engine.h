@@ -31,6 +31,9 @@ class UsbDeviceMonitor;
 class DiskSpaceMonitor;
 class SystemLoadMonitor;
 class LogMonitor;
+class PortMonitor;
+class PackageMonitor;
+class EnvironmentMonitor;
 }
 
 namespace storage {
@@ -66,6 +69,9 @@ public:
     monitor::DiskSpaceMonitor& disk_space_monitor();
     monitor::SystemLoadMonitor& system_load_monitor();
     monitor::LogMonitor& log_monitor();
+    monitor::PortMonitor& port_monitor();
+    monitor::PackageMonitor& package_monitor();
+    monitor::EnvironmentMonitor& environment_monitor();
 
     storage::Storage* storage();
     reporting::Reporter* reporter();
@@ -101,6 +107,9 @@ private:
     std::unique_ptr<monitor::DiskSpaceMonitor> disk_;
     std::unique_ptr<monitor::SystemLoadMonitor> load_;
     std::unique_ptr<monitor::LogMonitor> log_;
+    std::unique_ptr<monitor::PortMonitor> port_;
+    std::unique_ptr<monitor::PackageMonitor> pkg_;
+    std::unique_ptr<monitor::EnvironmentMonitor> env_;
 
     std::unique_ptr<storage::Storage> storage_;
     std::unique_ptr<reporting::Reporter> reporter_;

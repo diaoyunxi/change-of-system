@@ -18,6 +18,9 @@ set(COS_CORE_SOURCES
     monitor/disk_space/disk_space_monitor.cpp
     monitor/system_load/system_load_monitor.cpp
     monitor/log/log_monitor.cpp
+    monitor/port/port_monitor.cpp
+    monitor/package/package_monitor.cpp
+    monitor/environment/environment_monitor.cpp
     alert/alert_manager.cpp
     filter/event_filter.cpp
     stats/statistics.cpp
@@ -25,6 +28,7 @@ set(COS_CORE_SOURCES
     webhook/webhook_notifier.cpp
     export/event_exporter.cpp
     report/report_generator.cpp
+    utils/daemon.cpp
 )
 
 add_library(cos_core STATIC ${COS_CORE_SOURCES})

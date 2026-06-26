@@ -12,6 +12,9 @@
 #include "monitor/disk_space/disk_space_monitor.h"
 #include "monitor/system_load/system_load_monitor.h"
 #include "monitor/log/log_monitor.h"
+#include "monitor/port/port_monitor.h"
+#include "monitor/package/package_monitor.h"
+#include "monitor/environment/environment_monitor.h"
 #include "reporting/reporter.h"
 #include "storage/storage.h"
 #include "utils/logger.h"
@@ -38,6 +41,9 @@ bool MonitorEngine::initialize(const std::string& config_path) {
     disk_ = std::make_unique<monitor::DiskSpaceMonitor>();
     load_ = std::make_unique<monitor::SystemLoadMonitor>();
     log_ = std::make_unique<monitor::LogMonitor>();
+    port_ = std::make_unique<monitor::PortMonitor>();
+    pkg_ = std::make_unique<monitor::PackageMonitor>();
+    env_ = std::make_unique<monitor::EnvironmentMonitor>();
 
     int fs_interval = cfg.get_int("filesystem.poll_interval_ms", 3000);
     int proc_interval = cfg.get_int("process.poll_interval_ms", 3000);
@@ -50,6 +56,9 @@ bool MonitorEngine::initialize(const std::string& config_path) {
     int disk_interval = cfg.get_int("disk_space.poll_interval_ms", 30000);
     int load_interval = cfg.get_int("system_load.poll_interval_ms", 5000);
     int log_interval = cfg.get_int("log.poll_interval_ms", 5000);
+    int port_interval = cfg.get_int("port.poll_interval_ms", 5000);
+    int pkg_interval = cfg.get_int("package.poll_interval_ms", 60000);
+    int env_interval = cfg.get_int("environment.poll_interval_ms", 10000);
 
     fs_->set_poll_interval_ms(fs_interval);
     proc_->set_poll_interval_ms(proc_interval);
@@ -62,6 +71,9 @@ bool MonitorEngine::initialize(const std::string& config_path) {
     disk_->set_poll_interval_ms(disk_interval);
     load_->set_poll_interval_ms(load_interval);
     log_->set_poll_interval_ms(log_interval);
+    port_->set_poll_interval_ms(port_interval);
+    pkg_->set_poll_interval_ms(pkg_interval);
+    env_->set_poll_interval_ms(env_interval);
 
     auto watch_paths = cfg.get_list("filesystem.watch_paths", {"/tmp"});
     for (auto& p : watch_paths) fs_->add_watch_path(p);
@@ -76,6 +88,23 @@ bool MonitorEngine::initialize(const std::string& config_path) {
 
     load_->set_load_threshold(cfg.get_double("system_load.load_threshold", 5.0));
     load_->set_cpu_threshold(cfg.get_double("system_load.cpu_threshold", 90.0));
+
+    // Configure port monitor
+    auto watch_ports = cfg.get_list("port.watch_ports", {});
+    if (!watch_ports.empty()) {
+        std::set<int> ports;
+        for (const auto& p : watch_ports) {
+            try { ports.insert(std::stoi(p)); } catch (...) {}
+        }
+        port_->set_watch_ports(ports);
+    }
+
+    // Configure environment monitor
+    auto watch_vars = cfg.get_list("environment.watch_variables", {});
+    if (!watch_vars.empty()) {
+        std::set<std::string> vars(watch_vars.begin(), watch_vars.end());
+        env_->set_watch_variables(vars);
+    }
 
     // Configure log monitor
     auto log_paths = cfg.get_list("log.watch_paths", {});
@@ -192,6 +221,9 @@ bool MonitorEngine::initialize(const std::string& config_path) {
     disk_->on_event(route);
     load_->on_event(route);
     log_->on_event(route);
+    port_->on_event(route);
+    pkg_->on_event(route);
+    env_->on_event(route);
 
     return true;
 }
@@ -210,6 +242,9 @@ bool MonitorEngine::start_all() {
     if (disk_ && disk_->is_available()) disk_->start();
     if (load_ && load_->is_available()) load_->start();
     if (log_ && log_->is_available()) log_->start();
+    if (port_ && port_->is_available()) port_->start();
+    if (pkg_ && pkg_->is_available()) pkg_->start();
+    if (env_ && env_->is_available()) env_->start();
     if (reporter_) reporter_->start();
     return true;
 }
@@ -228,6 +263,9 @@ bool MonitorEngine::stop_all() {
     if (disk_) disk_->stop();
     if (load_) load_->stop();
     if (log_) log_->stop();
+    if (port_) port_->stop();
+    if (pkg_) pkg_->stop();
+    if (env_) env_->stop();
     if (reporter_) reporter_->stop();
     if (config_watcher_) config_watcher_->stop_watching();
     if (storage_) storage_->close();
@@ -294,6 +332,9 @@ monitor::UsbDeviceMonitor& MonitorEngine::usb_device_monitor() { return *usb_; }
 monitor::DiskSpaceMonitor& MonitorEngine::disk_space_monitor() { return *disk_; }
 monitor::SystemLoadMonitor& MonitorEngine::system_load_monitor() { return *load_; }
 monitor::LogMonitor& MonitorEngine::log_monitor() { return *log_; }
+monitor::PortMonitor& MonitorEngine::port_monitor() { return *port_; }
+monitor::PackageMonitor& MonitorEngine::package_monitor() { return *pkg_; }
+monitor::EnvironmentMonitor& MonitorEngine::environment_monitor() { return *env_; }
 
 storage::Storage* MonitorEngine::storage() { return storage_.get(); }
 reporting::Reporter* MonitorEngine::reporter() { return reporter_.get(); }

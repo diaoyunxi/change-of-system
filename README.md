@@ -25,6 +25,9 @@ to graph.
 | Disk        | Disk space warning / critical / changed     |
 | Load        | System load high / normal (CPU & memory)    |
 | Log         | Log pattern matches / anomalies detected    |
+| Port        | Port opened / closed / state changed        |
+| Package     | Package installed / updated / removed       |
+| Environment | Environment variable set / changed / unset  |
 | Security    | Security events (failed login, privilege escalation, suspicious activity) |
 
 ## Features
@@ -41,6 +44,16 @@ to graph.
 - **Disk Space Monitor**: Monitor disk usage with configurable warning/critical thresholds
 - **System Load Monitor**: Track system load averages, CPU usage, and memory usage
 - **Log Monitor**: Monitor log files for pattern matches and anomalies with regex support
+- **Port Monitor**: Track open ports and listening services, detect new/closed ports and state changes
+- **Package Monitor**: Monitor package installations, updates, and removals (supports APT, DNF, YUM, Pacman, Zypper, Homebrew, MacPorts)
+- **Environment Monitor**: Track environment variable changes (set, modified, unset)
+
+### Daemon Mode
+- Run as a background daemon with `-d` or `--daemon` flag
+- PID file management to prevent multiple instances
+- SIGHUP signal handler for configuration reload without restart
+- Automatic PID file cleanup on shutdown
+- Configurable PID file location with `--pid-file` option
 
 ### Alert System
 - Rule-based alerting with customizable conditions
@@ -199,6 +212,22 @@ Headless:
 ./change-of-system --config ../config.ini
 ```
 
+As a daemon:
+
+```bash
+# Run as background daemon
+./change-of-system --config config.ini --daemon
+
+# With custom PID file location
+./change-of-system --config config.ini --daemon --pid-file /tmp/change-of-system.pid
+
+# Reload configuration via signal
+kill -HUP $(cat /var/run/change-of-system.pid)
+
+# Stop the daemon
+kill $(cat /var/run/change-of-system.pid)
+```
+
 Export events to file:
 
 ```bash
@@ -260,6 +289,17 @@ system_load.poll_interval_ms = 5000
 system_load.load_threshold = 5.0
 system_load.cpu_threshold = 90.0
 
+port.enabled = true
+port.poll_interval_ms = 5000
+port.watch_ports = 22, 80, 443, 3306, 5432, 6379, 8080, 8443
+
+package.enabled = true
+package.poll_interval_ms = 60000
+
+environment.enabled = true
+environment.poll_interval_ms = 10000
+environment.watch_variables = PATH, HOME, USER, LD_LIBRARY_PATH
+
 storage.database_path = change-of-system.log
 storage.max_events = 100000
 
@@ -316,6 +356,9 @@ src/
     disk_space/      Disk space usage monitoring
     system_load/     System load and CPU/memory monitoring
     log/             Log file pattern matching and anomaly detection
+    port/            Open port and listening service monitoring
+    package/         Package installation/update/removal monitoring
+    environment/     Environment variable change monitoring
   storage/           Storage interface + default file/SQLite backend
   reporting/         HTTP batch reporter (JSON)
   alert/             Alert system with rule-based triggers
