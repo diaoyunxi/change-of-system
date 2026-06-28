@@ -34,6 +34,14 @@ All notable changes to this project will be documented in this file.
     - `config.watch_enabled`: Enable/disable watcher
     - `config.watch_interval_ms`: Check interval in milliseconds
 
+#### Auto-Update Checker
+- **Updater Module**: Automatically check for newer GitHub releases on startup
+  - Queries the GitHub Releases API, falls back to the Tags API
+  - Semantic version comparison (strips `v` prefix, compares dotted integers)
+  - Prompts the user (y/N) and optionally runs `git pull` to self-update
+  - Gated behind `COS_USE_REMOTE_REPORTING` (requires libcurl); compiles out cleanly otherwise
+  - New `-V` / `--version` CLI flag to print the current version and exit
+
 ### Changed
 - Updated MonitorEngine to support export, report, and config reload
 - Added new CLI options for export, report, and reload-config
@@ -41,10 +49,12 @@ All notable changes to this project will be documented in this file.
 - Enhanced config.ini.example with new configuration options
 
 ### Technical Details
-- New modules: `export/`, `report/`
-- New classes: `EventExporter`, `ReportGenerator`, `ConfigWatcher`
+- New modules: `export/`, `report/`, `updater/`
+- New classes: `EventExporter`, `ReportGenerator`, `ConfigWatcher`, updater `check_for_update()` / `prompt_update()`
 - Extended `MonitorEngine` with `export_events()`, `generate_report()`, `reload_config()`
 - Added `config_watcher_` member to MonitorEngine
+- Added libcurl detection (`find_package(CURL)`) in `src/CMakeLists.txt`; `COS_USE_REMOTE_REPORTING` now also gates the update checker and webhook HTTP code via a real compile definition
+- Bumped project version to 0.2.0
 - Updated CMakeLists.txt to include new source files
 
 ## [0.1.0] - Initial Release

@@ -123,6 +123,14 @@ to graph.
 - Update monitor intervals and settings on-the-fly
 - Configurable check interval
 
+### Auto-Update
+- Automatic version check against the latest GitHub release on startup
+- Queries the GitHub Releases API (falls back to the Tags API)
+- Compares semantic versions and prompts the user when a newer release exists
+- Optional one-step self-update via `git pull` run from the executable's directory
+- New `-V` / `--version` flag prints the current version and exits
+- Requires libcurl (gated by the `COS_USE_REMOTE_REPORTING` CMake option)
+
 ## Architecture
 
 ```
@@ -182,6 +190,7 @@ Requirements:
 
 - CMake >= 3.16
 - C++17 compiler (GCC, Clang, MSVC)
+- libcurl — **optional**, required for the auto-update checker and webhook/HTTP reporting (auto-detected via `find_package(CURL)`)
 - Qt5 (Widgets, Core, Gui) — **optional**, only for the GUI binary
 
 ```bash
@@ -196,8 +205,14 @@ CMake options:
 |--------------------------|---------|-------------------------------------------|
 | `COS_BUILD_GUI`          | `ON`    | Build the Qt GUI (qt5 required)           |
 | `COS_BUILD_TESTS`        | `OFF`   | Build unit tests                          |
-| `COS_USE_REMOTE_REPORTING` | `ON`  | Build the HTTP remote reporting module    |
+| `COS_USE_REMOTE_REPORTING` | `ON`  | Enable HTTP reporting, webhooks, and the auto-update checker (requires libcurl) |
 | `COS_WARNINGS_AS_ERRORS` | `OFF`   | Promote compiler warnings to errors       |
+
+> **Note:** The auto-update checker and the webhook/remote-reporting module are
+> compiled in only when libcurl is found **and** `COS_USE_REMOTE_REPORTING=ON`.
+> If libcurl is missing (or the option is `OFF`), the checker is compiled out
+> and `check_for_update()` returns a no-op `UpdateInfo` instead of making any
+> network request.
 
 Output binaries (in `build/`):
 
@@ -366,6 +381,7 @@ src/
   stats/             Statistics collection and analysis
   security/          Security audit and event detection
   webhook/           HTTP webhook notification system
+  updater/           GitHub release auto-update checker
   export/            Event data export (CSV, JSON)
   report/            Text report generation
   gui/               Qt5 dashboard

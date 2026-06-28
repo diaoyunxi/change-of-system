@@ -1,5 +1,6 @@
 #include "core/monitor_engine.h"
 #include "platform/platform_detection.h"
+#include "updater/updater.h"
 #include "utils/logger.h"
 #include "utils/daemon.h"
 
@@ -12,6 +13,9 @@
 #include <thread>
 
 namespace {
+
+static const char* VERSION = "0.2.0";
+
 std::atomic<bool> g_running{true};
 std::atomic<bool> g_reload_config{false};
 
@@ -33,6 +37,7 @@ void print_usage(const char* prog) {
         << "  --export <path>       Export events to file (CSV or JSON)\n"
         << "  --report <path>       Generate report to file\n"
         << "  --reload-config       Reload configuration file\n"
+        << "  -V, --version         Show version information and exit\n"
         << "  -h, --help            Show this help message\n"
         << "\n"
         << "Platform: " << changeos::platform::name() << "\n";
@@ -41,6 +46,10 @@ void print_usage(const char* prog) {
 } // namespace
 
 int main(int argc, char** argv) {
+    // Check for updates
+    auto update_info = changeos::updater::check_for_update(VERSION);
+    changeos::updater::prompt_update(update_info);
+
     std::string config_path;
     std::string export_path;
     std::string report_path;
@@ -52,6 +61,9 @@ int main(int argc, char** argv) {
         std::string arg = argv[i];
         if (arg == "-h" || arg == "--help") {
             print_usage(argv[0]);
+            return 0;
+        } else if (arg == "-V" || arg == "--version") {
+            std::cout << "change-of-system v" << VERSION << "\n";
             return 0;
         } else if ((arg == "-c" || arg == "--config") && i + 1 < argc) {
             config_path = argv[++i];

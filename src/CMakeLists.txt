@@ -26,6 +26,7 @@ set(COS_CORE_SOURCES
     stats/statistics.cpp
     security/security_auditor.cpp
     webhook/webhook_notifier.cpp
+    updater/updater.cpp
     export/event_exporter.cpp
     report/report_generator.cpp
     utils/daemon.cpp
@@ -45,6 +46,18 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(cos_core PUBLIC pthread)
     find_package(OpenSSL REQUIRED)
     target_link_libraries(cos_core PUBLIC OpenSSL::SSL OpenSSL::Crypto)
+endif()
+
+# CURL detection: enables the update checker and remote HTTP reporting
+# (webhook module). Gated by both CURL availability and the
+# COS_USE_REMOTE_REPORTING option (ON by default).
+find_package(CURL QUIET)
+if(CURL_FOUND AND COS_USE_REMOTE_REPORTING)
+    target_link_libraries(cos_core PUBLIC CURL::libcurl)
+    target_compile_definitions(cos_core PUBLIC COS_USE_REMOTE_REPORTING)
+    message(STATUS "CURL found - update checker and remote reporting enabled")
+else()
+    message(STATUS "CURL not found or remote reporting disabled - update checker disabled")
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
