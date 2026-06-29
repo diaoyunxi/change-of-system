@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <mutex>
 #include <sstream>
@@ -60,6 +61,8 @@ Event parse_event(const std::string& line) {
         ev.timestamp = std::chrono::system_clock::time_point(
             std::chrono::milliseconds(ms));
     } catch (...) {}
+    ev.category = category_from_name(tokens[1]);
+    ev.type = type_from_name(tokens[2]);
     ev.source = tokens[3];
     ev.target = tokens[4];
     ev.host = tokens[5];
@@ -99,6 +102,13 @@ public:
         std::lock_guard<std::mutex> lock(mutex_);
         path_ = connection_string;
         file_.open(path_, std::ios::app);
+        if (file_.is_open()) {
+            // Seed the byte counter from the existing file size so rotation
+            // works correctly across restarts.
+            std::error_code ec;
+            auto sz = std::filesystem::file_size(path_, ec);
+            bytes_written_ = ec ? 0 : static_cast<std::int64_t>(sz);
+        }
         return file_.is_open();
     }
 
@@ -110,6 +120,12 @@ public:
     bool is_open() const override {
         std::lock_guard<std::mutex> lock(mutex_);
         return file_.is_open();
+    }
+
+    void configure_rotation(std::int64_t max_bytes, int max_files) override {
+        std::lock_guard<std::mutex> lock(mutex_);
+        rotate_max_bytes_ = max_bytes > 0 ? max_bytes : 0;
+        rotate_max_files_ = max_files > 0 ? max_files : 0;
     }
 
     std::int64_t count() const override {
@@ -124,8 +140,11 @@ public:
     void insert(const Event& event) override {
         std::lock_guard<std::mutex> lock(mutex_);
         if (!file_.is_open()) return;
-        file_ << serialize_event(event) << "\n";
+        std::string line = serialize_event(event);
+        file_ << line << "\n";
         file_.flush();
+        bytes_written_ += static_cast<std::int64_t>(line.size()) + 1;
+        maybe_rotate_locked();
     }
 
     std::vector<Event> query(const QueryFilter& filter) const override {
@@ -176,12 +195,56 @@ public:
         in.close();
         std::ofstream out(path_, std::ios::trunc);
         for (auto& l : keep) out << l << "\n";
+        bytes_written_ = 0;
+        for (auto& l : keep) bytes_written_ += static_cast<std::int64_t>(l.size()) + 1;
     }
 
 private:
+    // Caller must hold mutex_.
+    void maybe_rotate_locked() {
+        if (rotate_max_bytes_ <= 0 || rotate_max_files_ <= 0) return;
+        if (bytes_written_ < rotate_max_bytes_) return;
+        if (path_.empty()) return;
+
+        // Close the active file before renaming.
+        if (file_.is_open()) file_.close();
+
+        std::error_code ec;
+        // Delete the oldest backup, shift the rest up.
+        std::string oldest = path_ + "." + std::to_string(rotate_max_files_);
+        std::filesystem::remove(oldest, ec);
+
+        for (int i = rotate_max_files_ - 1; i >= 1; --i) {
+            std::string src = path_ + "." + std::to_string(i);
+            std::string dst = path_ + "." + std::to_string(i + 1);
+            std::error_code rec;
+            if (std::filesystem::exists(src, rec)) {
+                std::filesystem::rename(src, dst, rec);
+            }
+        }
+
+        // Move the current file to .1
+        std::string first_backup = path_ + ".1";
+        std::filesystem::rename(path_, first_backup, ec);
+
+        // Open a fresh file.
+        file_.open(path_, std::ios::app);
+        bytes_written_ = 0;
+        if (!file_.is_open()) {
+            COS_LOG_ERROR("Failed to reopen storage file after rotation: " + path_);
+        } else {
+            COS_LOG_INFO("Rotated storage file (max_bytes=" +
+                         std::to_string(rotate_max_bytes_) +
+                         ", backups=" + std::to_string(rotate_max_files_) + ")");
+        }
+    }
+
     mutable std::mutex mutex_;
     std::string path_;
     std::ofstream file_;
+    std::int64_t bytes_written_ = 0;
+    std::int64_t rotate_max_bytes_ = 0;
+    int rotate_max_files_ = 0;
 };
 
 } // namespace

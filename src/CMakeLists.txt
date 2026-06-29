@@ -29,6 +29,9 @@ set(COS_CORE_SOURCES
     updater/updater.cpp
     export/event_exporter.cpp
     report/report_generator.cpp
+    snapshot/snapshot_generator.cpp
+    query/event_query.cpp
+    diagnostic/diagnostic_runner.cpp
     utils/daemon.cpp
 )
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/event.h"
+#include "core/monitor.h"
 #include "alert/alert_manager.h"
 #include "filter/event_filter.h"
 #include "stats/statistics.h"
@@ -9,6 +10,9 @@
 #include "export/event_exporter.h"
 #include "report/report_generator.h"
 #include "config/config_watcher.h"
+#include "snapshot/snapshot_generator.h"
+#include "query/event_query.h"
+#include "diagnostic/diagnostic_runner.h"
 
 #include <atomic>
 #include <functional>
@@ -81,6 +85,11 @@ public:
     security::SecurityAuditor* security_auditor();
     webhook::WebhookNotifier* webhook_notifier();
 
+    // Returns pointers to every registered monitor. Pointers remain valid for
+    // the lifetime of the engine. Used by the diagnostic runner and any tool
+    // that needs to inspect monitor state without starting them.
+    std::vector<Monitor*> monitors() const;
+
     std::vector<Event> recent_events(int limit = 100) const;
 
     // Export events to file
@@ -92,6 +101,13 @@ public:
     // Enable config file watching
     void enable_config_watch();
     void disable_config_watch();
+
+    // One-shot system state snapshot written as JSON.
+    bool capture_snapshot(const snapshot::SnapshotConfig& config);
+    // Query stored events and print results to stdout.
+    int query_events(const query::QueryOptions& opts);
+    // Run a diagnostic self-test and write a report (empty path = stdout).
+    diagnostic::DiagnosticResult run_diagnostic(const std::string& output_path);
 
 private:
     void route_event(const Event& event);

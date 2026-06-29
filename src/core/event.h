@@ -73,6 +73,11 @@ std::string category_name(EventCategory c);
 std::string type_name(EventType t);
 EventCategory category_of(EventType t);
 
+// Reverse lookups used when parsing events back from storage. Unknown names
+// map to EventCategory::Unknown / EventType::Unknown respectively.
+EventCategory category_from_name(const std::string& name);
+EventType type_from_name(const std::string& name);
+
 struct Event {
     std::uint64_t id = 0;
     Timestamp timestamp = now();

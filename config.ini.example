@@ -84,6 +84,25 @@ system_load.cpu_threshold = 90.0
 # ------------------------------
 storage.database_path = change-of-system.log
 storage.max_events = 100000
+# Automatic log rotation. When the storage file exceeds max_size_mb it is
+# renamed to <database_path>.1, older backups are shifted up, and a fresh
+# file is opened. Up to rotate_count backups are kept. Set max_size_mb = 0
+# (the default) to disable rotation.
+storage.max_size_mb = 0
+storage.rotate_count = 5
+
+# ------------------------------
+# Snapshot mode (--snapshot)
+# ------------------------------
+# These only affect the one-shot --snapshot command.
+# Maximum number of processes to include (top by memory).
+snapshot.max_processes = 50
+snapshot.include_processes = true
+snapshot.include_network = true
+snapshot.include_ports = true
+snapshot.include_disk = true
+snapshot.include_load = true
+snapshot.include_environment = true
 
 # ------------------------------
 # Remote reporting (optional)

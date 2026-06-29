@@ -37,6 +37,15 @@ public:
     virtual std::vector<Event> query(const QueryFilter& filter) const = 0;
     virtual void iterate(std::function<void(const Event&)> cb) const = 0;
     virtual void prune(std::int64_t max_events) = 0;
+
+    // Configure automatic rotation of the underlying storage file. When the
+    // current file exceeds max_bytes, it is renamed to <path>.1, older backups
+    // are shifted, and a fresh file is opened. Up to max_files backups are kept.
+    // Backends that do not support rotation treat this as a no-op.
+    virtual void configure_rotation(std::int64_t max_bytes, int max_files) {
+        (void)max_bytes;
+        (void)max_files;
+    }
 };
 
 std::unique_ptr<Storage> create_sqlite_storage();

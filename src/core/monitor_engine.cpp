@@ -126,6 +126,16 @@ bool MonitorEngine::initialize(const std::string& config_path) {
         COS_LOG_INFO("Storage backend opened: " + storage_path);
     }
 
+    // Configure log rotation if requested.
+    int rotate_max_mb = cfg.get_int("storage.max_size_mb", 0);
+    int rotate_count = cfg.get_int("storage.rotate_count", 5);
+    if (rotate_max_mb > 0) {
+        std::int64_t max_bytes = static_cast<std::int64_t>(rotate_max_mb) * 1024LL * 1024LL;
+        storage_->configure_rotation(max_bytes, rotate_count);
+        COS_LOG_INFO("Storage rotation enabled: max_size=" + std::to_string(rotate_max_mb) +
+                     "MB, backups=" + std::to_string(rotate_count));
+    }
+
     reporter_ = std::make_unique<reporting::Reporter>();
     reporter_->configure(
         cfg.get("reporting.endpoint"),
@@ -426,6 +436,37 @@ void MonitorEngine::disable_config_watch() {
         config_watcher_->stop_watching();
         COS_LOG_INFO("Config file watcher disabled");
     }
+}
+
+std::vector<Monitor*> MonitorEngine::monitors() const {
+    std::vector<Monitor*> result;
+    if (fs_)         result.push_back(fs_.get());
+    if (proc_)       result.push_back(proc_.get());
+    if (net_)        result.push_back(net_.get());
+    if (cfg_)        result.push_back(cfg_.get());
+    if (user_)       result.push_back(user_.get());
+    if (service_)    result.push_back(service_.get());
+    if (integrity_)  result.push_back(integrity_.get());
+    if (usb_)        result.push_back(usb_.get());
+    if (disk_)       result.push_back(disk_.get());
+    if (load_)       result.push_back(load_.get());
+    if (log_)        result.push_back(log_.get());
+    if (port_)       result.push_back(port_.get());
+    if (pkg_)        result.push_back(pkg_.get());
+    if (env_)        result.push_back(env_.get());
+    return result;
+}
+
+bool MonitorEngine::capture_snapshot(const snapshot::SnapshotConfig& config) {
+    return snapshot::SnapshotGenerator::generate(config);
+}
+
+int MonitorEngine::query_events(const query::QueryOptions& opts) {
+    return query::EventQuery::run(storage_.get(), opts);
+}
+
+diagnostic::DiagnosticResult MonitorEngine::run_diagnostic(const std::string& output_path) {
+    return diagnostic::DiagnosticRunner::run(*this, output_path);
 }
 
 } // namespace changeos

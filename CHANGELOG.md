@@ -2,7 +2,77 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.3.0] - 2026-06-30
+
+### Added
+
+#### System Snapshot Mode
+- **Snapshot Generator**: One-shot capture of the current system state as JSON
+  - Captures metadata (timestamp, host, platform, architecture, user, uptime)
+  - System load (1/5/15-min load averages, memory, swap)
+  - Disk usage for all real mount points (filters pseudo-filesystems)
+  - Top-N processes by memory (pid, ppid, name, user, cmdline)
+  - Network connections parsed from `/proc/net/{tcp,udp,tcp6,udp6}`
+  - Listening ports (TCP LISTEN + unconnected UDP)
+  - Curated environment variables (PATH, HOME, USER, SHELL, ...)
+  - Command-line: `--snapshot [path]` (omit path or `-` for stdout)
+  - Ideal for baselines, audits, and point-in-time system records
+
+#### Diagnostic / Self-Test Mode
+- **Diagnostic Runner**: Verify monitor availability and sub-system health
+  - Reports each monitor's availability, poll interval, and native-event support
+  - Reports status of storage, reporter, alert manager, event filter,
+    statistics, security auditor, and webhook notifier
+  - Storage event count displayed for at-a-glance verification
+  - Command-line: `--diagnose [path]` (omit path for stdout)
+  - Exits with code 2 if any monitor is unavailable (script-friendly)
+
+#### Event Query
+- **Event Query**: Search stored events from the command line
+  - Filter by keyword (matches summary, target, or source — case-insensitive)
+  - Filter by category (`filesystem`, `process`, `network`, `system_config`,
+    `hardware`, `system`)
+  - Filter by source substring
+  - Filter by time range (`--query-from` / `--query-to` as unix milliseconds)
+  - Pagination via `--query-offset` and `--query-limit`
+  - Human-readable or `--query-json` output
+  - Results sorted most-recent-first
+
+#### Storage Log Rotation
+- **Automatic Rotation**: Cap storage file growth and keep backups
+  - New config keys: `storage.max_size_mb` and `storage.rotate_count`
+  - When the active file exceeds `max_size_mb`, it is renamed to `<path>.1`,
+    older backups are shifted (`.<n>` → `.<n+1>`), and a fresh file is opened
+  - Up to `rotate_count` backups are retained; the oldest is removed
+  - Byte counter is seeded from existing file size, so rotation is correct
+    across daemon restarts
+  - Disabled by default (`max_size_mb = 0`)
+
+### Changed
+- Fixed storage round-trip: `parse_event` now restores `Event::category` and
+  `Event::type` from the serialized names (previously always `Unknown`), so
+  category-based queries and exports are accurate
+- Added reverse lookups `category_from_name()` / `type_from_name()` to the
+  Event API
+- `MonitorEngine` now exposes `monitors()`, `capture_snapshot()`,
+  `query_events()`, and `run_diagnostic()` for programmatic access
+- `Storage` interface gained `configure_rotation()` (no-op default; backed by
+  the file storage)
+- One-shot CLI modes (`--snapshot`, `--diagnose`, `--query`, `--export`,
+  `--report`, `--reload-config`, `--version`, `--help`) now skip the
+  interactive update check for faster, non-interactive operation
+- Bumped project version to 0.3.0
+
+### Technical Details
+- New modules: `snapshot/`, `query/`, `diagnostic/`
+- New classes: `SnapshotGenerator`, `EventQuery`, `DiagnosticRunner`
+- New CLI flags: `--snapshot`, `--diagnose`, `--query`, `--query-category`,
+  `--query-source`, `--query-from`, `--query-to`, `--query-limit`,
+  `--query-offset`, `--query-json`
+- Snapshot module reads `/proc/{loadavg,meminfo,uptime,mounts,net/*}` and
+  `/proc/<pid>/{status,cmdline}` directly — no monitor start required
+
+## [0.2.0] - Data export, reports, hot-reload, auto-update
 
 ### Added
 

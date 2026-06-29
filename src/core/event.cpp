@@ -98,4 +98,51 @@ EventCategory category_of(EventType t) {
     }
 }
 
+EventCategory category_from_name(const std::string& name) {
+    if (name == "filesystem")    return EventCategory::Filesystem;
+    if (name == "process")       return EventCategory::Process;
+    if (name == "network")       return EventCategory::Network;
+    if (name == "system_config") return EventCategory::SystemConfig;
+    if (name == "hardware")      return EventCategory::Hardware;
+    if (name == "system")        return EventCategory::System;
+    return EventCategory::Unknown;
+}
+
+EventType type_from_name(const std::string& name) {
+    if (name == "file_created")             return EventType::FileCreated;
+    if (name == "file_modified")            return EventType::FileModified;
+    if (name == "file_deleted")             return EventType::FileDeleted;
+    if (name == "file_moved")               return EventType::FileMoved;
+    if (name == "file_permission_changed")  return EventType::FilePermissionChanged;
+
+    if (name == "process_started")          return EventType::ProcessStarted;
+    if (name == "process_stopped")          return EventType::ProcessStopped;
+    if (name == "process_cpu_spike")        return EventType::ProcessCpuSpike;
+    if (name == "process_memory_spike")     return EventType::ProcessMemorySpike;
+
+    if (name == "network_connection_opened")  return EventType::NetworkConnectionOpened;
+    if (name == "network_connection_closed")  return EventType::NetworkConnectionClosed;
+    if (name == "network_bandwidth_spike")    return EventType::NetworkBandwidthSpike;
+    if (name == "network_dns_query")          return EventType::NetworkDnsQuery;
+
+    if (name == "config_value_changed")    return EventType::ConfigValueChanged;
+    if (name == "service_state_changed")   return EventType::ServiceStateChanged;
+    if (name == "user_logged_in")          return EventType::UserLoggedIn;
+    if (name == "user_logged_out")         return EventType::UserLoggedOut;
+
+    if (name == "usb_device_inserted")     return EventType::UsbDeviceInserted;
+    if (name == "usb_device_removed")      return EventType::UsbDeviceRemoved;
+
+    if (name == "disk_space_warning")      return EventType::DiskSpaceWarning;
+    if (name == "disk_space_critical")     return EventType::DiskSpaceCritical;
+    if (name == "disk_space_changed")      return EventType::DiskSpaceChanged;
+    if (name == "system_load_high")        return EventType::SystemLoadHigh;
+    if (name == "system_load_normal")      return EventType::SystemLoadNormal;
+
+    if (name == "log_pattern_matched")     return EventType::LogPatternMatched;
+    if (name == "log_anomaly_detected")    return EventType::LogAnomalyDetected;
+
+    return EventType::Unknown;
+}
+
 } // namespace changeos

@@ -131,6 +131,35 @@ to graph.
 - New `-V` / `--version` flag prints the current version and exits
 - Requires libcurl (gated by the `COS_USE_REMOTE_REPORTING` CMake option)
 
+### System Snapshot
+- One-shot capture of the current system state as a JSON document
+- Records metadata (timestamp, host, platform, architecture, user, uptime)
+- Captures system load, memory/swap, disk usage, top-N processes,
+  network connections, listening ports, and curated environment variables
+- `--snapshot [path]` writes to a file (omit path or use `-` for stdout)
+- Does not start the monitors — useful for baselines and point-in-time audits
+
+### Diagnostic / Self-Test
+- `--diagnose [path]` reports the availability of every monitor and the
+  health of all sub-systems (storage, reporter, alerts, filter, statistics,
+  security, webhook)
+- Exits with code 2 if any monitor is unavailable, so it can be used in
+  health-check scripts
+
+### Event Query
+- `--query [keyword]` searches persisted events from the command line
+- Filters: `--query-category <name>`, `--query-source <substr>`,
+  `--query-from <unix_ms>`, `--query-to <unix_ms>`
+- Pagination: `--query-limit <n>`, `--query-offset <n>`
+- `--query-json` switches to structured JSON output
+- Results are sorted most-recent-first
+
+### Storage Log Rotation
+- Cap storage growth with `storage.max_size_mb` and `storage.rotate_count`
+- When the active file exceeds the limit it is rotated to `<path>.1`, older
+  backups are shifted, and a fresh file is opened
+- Disabled by default (`storage.max_size_mb = 0`)
+
 ## Architecture
 
 ```
@@ -265,6 +294,40 @@ Reload configuration:
 ./change-of-system --config config.ini --reload-config
 ```
 
+Capture a one-shot system snapshot:
+
+```bash
+# Write JSON snapshot to a file
+./change-of-system --snapshot snapshot.json
+
+# Print snapshot to stdout
+./change-of-system --snapshot -
+```
+
+Run a diagnostic self-test:
+
+```bash
+# Print the report to stdout (exit code 2 if any monitor is unavailable)
+./change-of-system --diagnose
+
+# Write the report to a file
+./change-of-system --diagnose diagnose.txt
+```
+
+Query stored events:
+
+```bash
+# Most recent 20 events
+./change-of-system --query --query-limit 20
+
+# Filesystem events containing "passwd", as JSON
+./change-of-system --query passwd --query-category filesystem --query-json
+
+# Events from a specific source within a time window
+./change-of-system --query --query-source package_monitor \
+    --query-from 1782750000000 --query-to 1782750900000 --query-limit 100
+```
+
 Sample `config.ini` (see `config.ini.example` for a complete one):
 
 ```
@@ -384,6 +447,9 @@ src/
   updater/           GitHub release auto-update checker
   export/            Event data export (CSV, JSON)
   report/            Text report generation
+  snapshot/          One-shot system state snapshot (JSON)
+  query/             Stored-event query with filters
+  diagnostic/        Monitor / sub-system self-test
   gui/               Qt5 dashboard
   config/            Simple INI-style config store + hot-reload watcher
   platform/          OS/arch detection

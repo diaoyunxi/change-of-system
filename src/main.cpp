@@ -1,4 +1,5 @@
 #include "core/monitor_engine.h"
+#include "config/config_store.h"
 #include "platform/platform_detection.h"
 #include "updater/updater.h"
 #include "utils/logger.h"
@@ -14,7 +15,7 @@
 
 namespace {
 
-static const char* VERSION = "0.2.0";
+static const char* VERSION = "0.3.0";
 
 std::atomic<bool> g_running{true};
 std::atomic<bool> g_reload_config{false};
@@ -30,30 +31,65 @@ void on_sighup(int) {
 void print_usage(const char* prog) {
     std::cout << "Usage: " << prog << " [options]\n"
         << "Options:\n"
-        << "  -c, --config <path>   Path to configuration file\n"
-        << "  -d, --daemon          Run as daemon (background)\n"
-        << "  --pid-file <path>     PID file path (default: /var/run/change-of-system.pid)\n"
-        << "  --no-daemon           Run in the foreground (default)\n"
-        << "  --export <path>       Export events to file (CSV or JSON)\n"
-        << "  --report <path>       Generate report to file\n"
-        << "  --reload-config       Reload configuration file\n"
-        << "  -V, --version         Show version information and exit\n"
-        << "  -h, --help            Show this help message\n"
+        << "  -c, --config <path>       Path to configuration file\n"
+        << "  -d, --daemon              Run as daemon (background)\n"
+        << "  --pid-file <path>         PID file path (default: /var/run/change-of-system.pid)\n"
+        << "  --no-daemon               Run in the foreground (default)\n"
+        << "  --export <path>           Export events to file (CSV or JSON)\n"
+        << "  --report <path>           Generate report to file\n"
+        << "  --reload-config           Reload configuration file\n"
+        << "  --snapshot [path]         Capture a one-shot system state snapshot and exit.\n"
+        << "                            If path is omitted or '-' writes JSON to stdout.\n"
+        << "  --diagnose [path]         Run a self-test of monitors and sub-systems, then exit.\n"
+        << "                            If path is omitted writes the report to stdout.\n"
+        << "  --query [keyword]         Query stored events and print to stdout.\n"
+        << "  --query-category <name>   Filter query by category (filesystem/process/...)\n"
+        << "  --query-source <substr>   Filter query by source substring\n"
+        << "  --query-from <unix_ms>    Query events at or after this timestamp (ms)\n"
+        << "  --query-to <unix_ms>      Query events at or before this timestamp (ms)\n"
+        << "  --query-limit <n>         Max events to print (default 50, 0 = unlimited)\n"
+        << "  --query-offset <n>        Skip first N matches (default 0)\n"
+        << "  --query-json              Output query results as JSON\n"
+        << "  -V, --version             Show version information and exit\n"
+        << "  -h, --help                Show this help message\n"
         << "\n"
         << "Platform: " << changeos::platform::name() << "\n";
+}
+
+// Returns true if any of the one-shot / non-interactive modes is requested,
+// so the update check can be skipped for them.
+bool is_one_shot_mode(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string a = argv[i];
+        if (a == "-V" || a == "--version" || a == "-h" || a == "--help" ||
+            a == "--snapshot" || a == "--diagnose" || a == "--query" ||
+            a == "--export" || a == "--report" || a == "--reload-config") {
+            return true;
+        }
+    }
+    return false;
 }
 
 } // namespace
 
 int main(int argc, char** argv) {
-    // Check for updates
-    auto update_info = changeos::updater::check_for_update(VERSION);
-    changeos::updater::prompt_update(update_info);
+    // Skip the interactive update check for one-shot commands.
+    if (!is_one_shot_mode(argc, argv)) {
+        auto update_info = changeos::updater::check_for_update(VERSION);
+        changeos::updater::prompt_update(update_info);
+    }
 
     std::string config_path;
     std::string export_path;
     std::string report_path;
     std::string pid_file = "/var/run/change-of-system.pid";
+    std::string snapshot_path;
+    bool snapshot_mode = false;
+    std::string diagnose_path;
+    bool diagnose_mode = false;
+    bool query_mode = false;
+    std::string query_keyword;
+    changeos::query::QueryOptions query_opts;
     bool reload_config = false;
     bool daemon_mode = false;
 
@@ -77,7 +113,91 @@ int main(int argc, char** argv) {
             report_path = argv[++i];
         } else if (arg == "--reload-config") {
             reload_config = true;
+        } else if (arg == "--snapshot") {
+            snapshot_mode = true;
+            // Optional path argument: only consume if next token is not another flag.
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                snapshot_path = argv[++i];
+            }
+        } else if (arg == "--diagnose") {
+            diagnose_mode = true;
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                diagnose_path = argv[++i];
+            }
+        } else if (arg == "--query") {
+            query_mode = true;
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                query_keyword = argv[++i];
+            }
+        } else if (arg == "--query-category" && i + 1 < argc) {
+            query_opts.category = argv[++i];
+        } else if (arg == "--query-source" && i + 1 < argc) {
+            query_opts.source = argv[++i];
+        } else if (arg == "--query-from" && i + 1 < argc) {
+            try { query_opts.from_unix_ms = std::stoll(argv[++i]); }
+            catch (...) { std::cerr << "Invalid --query-from value\n"; return 1; }
+        } else if (arg == "--query-to" && i + 1 < argc) {
+            try { query_opts.to_unix_ms = std::stoll(argv[++i]); }
+            catch (...) { std::cerr << "Invalid --query-to value\n"; return 1; }
+        } else if (arg == "--query-limit" && i + 1 < argc) {
+            try { query_opts.limit = std::stoi(argv[++i]); }
+            catch (...) { std::cerr << "Invalid --query-limit value\n"; return 1; }
+        } else if (arg == "--query-offset" && i + 1 < argc) {
+            try { query_opts.offset = std::stoi(argv[++i]); }
+            catch (...) { std::cerr << "Invalid --query-offset value\n"; return 1; }
+        } else if (arg == "--query-json") {
+            query_opts.json_output = true;
         }
+    }
+
+    // --- Snapshot mode: capture state and exit (no engine start) ----------
+    if (snapshot_mode) {
+        changeos::MonitorEngine engine;
+        if (!engine.initialize(config_path)) {
+            std::cerr << "Failed to initialize monitor engine\n";
+            return 1;
+        }
+        changeos::snapshot::SnapshotConfig sc;
+        sc.output_path = (snapshot_path.empty() || snapshot_path == "-")
+                         ? std::string() : snapshot_path;
+        auto& cfg = changeos::config::ConfigStore::instance();
+        sc.max_processes = cfg.get_int("snapshot.max_processes", 50);
+        sc.include_processes = cfg.get_bool("snapshot.include_processes", true);
+        sc.include_network = cfg.get_bool("snapshot.include_network", true);
+        sc.include_ports = cfg.get_bool("snapshot.include_ports", true);
+        sc.include_disk = cfg.get_bool("snapshot.include_disk", true);
+        sc.include_load = cfg.get_bool("snapshot.include_load", true);
+        sc.include_environment = cfg.get_bool("snapshot.include_environment", true);
+
+        if (!engine.capture_snapshot(sc)) {
+            std::cerr << "Failed to capture snapshot\n";
+            return 1;
+        }
+        return 0;
+    }
+
+    // --- Diagnostic mode: self-test and exit -----------------------------
+    if (diagnose_mode) {
+        changeos::MonitorEngine engine;
+        if (!engine.initialize(config_path)) {
+            std::cerr << "Failed to initialize monitor engine\n";
+            return 1;
+        }
+        auto result = engine.run_diagnostic(diagnose_path);
+        // Non-zero exit if any monitor is unavailable, to aid scripting.
+        return result.unavailable > 0 ? 2 : 0;
+    }
+
+    // --- Query mode: search storage and exit -----------------------------
+    if (query_mode) {
+        changeos::MonitorEngine engine;
+        if (!engine.initialize(config_path)) {
+            std::cerr << "Failed to initialize monitor engine\n";
+            return 1;
+        }
+        query_opts.keyword = query_keyword;
+        engine.query_events(query_opts);
+        return 0;
     }
 
     // Check if already running
