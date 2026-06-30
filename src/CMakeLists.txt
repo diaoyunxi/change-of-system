@@ -32,6 +32,10 @@ set(COS_CORE_SOURCES
     snapshot/snapshot_generator.cpp
     query/event_query.cpp
     diagnostic/diagnostic_runner.cpp
+    tail/tail_watcher.cpp
+    validate/config_validator.cpp
+    snapshot_diff/snapshot_diff.cpp
+    info/system_info.cpp
     utils/daemon.cpp
 )
 
