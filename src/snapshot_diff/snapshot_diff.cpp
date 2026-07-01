@@ -353,13 +353,13 @@ const JsonValue* extract_snapshot(const JsonValue& root) {
     return it == root.obj_val.end() ? nullptr : &it->second;
 }
 
-const JsonValue* extract_sections(const JsonValue& snap) {
+const JsonValue* extract_sections(const JsonValue* snap) {
     if (!snap || !snap->is_object()) return nullptr;
     auto it = snap->obj_val.find("sections");
     return it == snap->obj_val.end() ? nullptr : &it->second;
 }
 
-const JsonValue* extract_meta_field(const JsonValue& snap, const std::string& key) {
+const JsonValue* extract_meta_field(const JsonValue* snap, const std::string& key) {
     if (!snap || !snap->is_object()) return nullptr;
     auto it = snap->obj_val.find(key);
     return it == snap->obj_val.end() ? nullptr : &it->second;
@@ -400,8 +400,8 @@ int SnapshotDiff::run(const DiffOptions& opts) {
         std::cerr << "错误: 快照缺少 'snapshot' 顶层对象\n";
         return 2;
     }
-    const JsonValue* secs_a = extract_sections(*snap_a);
-    const JsonValue* secs_b = extract_sections(*snap_b);
+    const JsonValue* secs_a = extract_sections(snap_a);
+    const JsonValue* secs_b = extract_sections(snap_b);
     if (!secs_a || !secs_b) {
         std::cerr << "错误: 快照缺少 'sections' 字段\n";
         return 2;
@@ -409,7 +409,7 @@ int SnapshotDiff::run(const DiffOptions& opts) {
 
     // 时间戳元数据
     auto get_ts = [](const JsonValue* snap) -> std::string {
-        const JsonValue* v = extract_meta_field(*snap, "timestamp");
+        const JsonValue* v = extract_meta_field(snap, "timestamp");
         return v ? scalar_to_string(*v) : "?";
     };
     std::string ts_a = get_ts(snap_a);
@@ -468,8 +468,8 @@ int SnapshotDiff::run(const DiffOptions& opts) {
         "host", "platform", "architecture", "user", "uptime_seconds"
     };
     for (const auto& k : meta_keys) {
-        const JsonValue* va = extract_meta_field(*snap_a, k);
-        const JsonValue* vb = extract_meta_field(*snap_b, k);
+        const JsonValue* va = extract_meta_field(snap_a, k);
+        const JsonValue* vb = extract_meta_field(snap_b, k);
         if (va && vb && scalar_to_string(*va) != scalar_to_string(*vb)) {
             meta_diffs.emplace_back(k, scalar_to_string(*va) + " -> " + scalar_to_string(*vb));
             any_diff = true;

@@ -160,6 +160,55 @@ to graph.
   backups are shifted, and a fresh file is opened
 - Disabled by default (`storage.max_size_mb = 0`)
 
+### Live Tail Mode
+- Real-time event stream (`tail -f` style) to stdout
+- Filter by category (`--tail-category`), source substring (`--tail-source`),
+  or keyword (`--tail-keyword`, matches summary/target/source)
+- Optional ANSI color output (`--tail-color`) that color-codes events by
+  severity (red = deletion/critical, green = creation, yellow = modification,
+  cyan = user activity)
+- Optional one-JSON-object-per-line output (`--tail-json`) for piping into `jq`
+- `--tail-recent <n>` replays the last N stored events before live streaming
+- Clean Ctrl+C shutdown
+
+### Config Validation
+- Pre-flight check of a config file before starting the daemon
+- Syntax checks: missing `=`, empty keys, duplicate keys
+- Type checks: bool / int / double / port list (0-65535)
+- Semantic checks: threshold relationships (warning < critical), positive
+  poll intervals, sub-100ms intervals warned as CPU-heavy, reporting/webhook
+  endpoint presence and URL scheme
+- Unknown-key detection surfaces likely typos
+- `--validate-config [path]` exits 0 if OK, 1 if errors found
+- Path precedence: explicit arg > `-c/--config` > `config.ini`
+
+### Snapshot Diff
+- Compare two snapshot JSON files and print the differences
+- Built-in minimal JSON parser (no third-party dependency)
+- Indexes array elements by primary key (pid / port / device+mount /
+  address / name) to intelligently match additions, removals, and changes
+- Compares metadata (host / platform / architecture / user / uptime) and
+  every section (system, disks, processes, connections, listening_ports,
+  environment)
+- Text output with counts and optional per-item detail
+  (`--snapshot-diff-verbose`)
+- JSON output (`--snapshot-diff-json`) for programmatic consumption
+- Exit codes: 0 = identical, 1 = differences, 2 = error (unreadable file)
+- Useful for baseline-drift detection, change audits, before/after comparison
+
+### System Info
+- One-shot quick system summary (neofetch-style, monitoring-focused)
+- Metadata: timestamp, hostname, user, OS distro, kernel, platform/arch,
+  uptime
+- CPU: model, core count, current frequency
+- System load (1/5/15-min)
+- Memory: total/used/available + usage bar
+- Disks: per-mount total/used/free + usage bar
+- Summary: process count, listening port count
+- `--info [section]` (section optional: `json` or `color`)
+- Also `--info-json` / `--info-color` standalone flags
+- Color mode shades usage bars by severity (≥95% red, ≥80% yellow, else green)
+
 ## Architecture
 
 ```
@@ -328,6 +377,61 @@ Query stored events:
     --query-from 1782750000000 --query-to 1782750900000 --query-limit 100
 ```
 
+Stream events live (like `tail -f`):
+
+```bash
+# All events, plain text
+./change-of-system --config config.ini --tail
+
+# Only filesystem events, colored, with last 50 historical events first
+./change-of-system --config config.ini --tail --tail-category filesystem \
+    --tail-color --tail-recent 50
+
+# All events as one JSON object per line, piped to jq
+./change-of-system --config config.ini --tail --tail-json | jq .
+```
+
+Validate a config file before starting:
+
+```bash
+# Validate the default config.ini
+./change-of-system --validate-config
+
+# Validate a specific file (exits 0 if OK, 1 if errors)
+./change-of-system --validate-config /etc/change-of-system/config.ini
+```
+
+Compare two snapshots:
+
+```bash
+# Capture two snapshots at different times
+./change-of-system --snapshot before.json
+# ... make changes to the system ...
+./change-of-system --snapshot after.json
+
+# Show what changed (exit 0 = identical, 1 = differs, 2 = error)
+./change-of-system --snapshot-diff before.json after.json
+
+# Detailed per-item changes
+./change-of-system --snapshot-diff before.json after.json --snapshot-diff-verbose
+
+# Machine-readable JSON output
+./change-of-system --snapshot-diff before.json after.json --snapshot-diff-json
+```
+
+Print a quick system info summary:
+
+```bash
+# Plain text summary
+./change-of-system --info
+
+# JSON output
+./change-of-system --info json
+
+# Colored output (usage bars shaded by severity)
+./change-of-system --info color
+```
+
 Sample `config.ini` (see `config.ini.example` for a complete one):
 
 ```
@@ -450,6 +554,10 @@ src/
   snapshot/          One-shot system state snapshot (JSON)
   query/             Stored-event query with filters
   diagnostic/        Monitor / sub-system self-test
+  tail/              Live event stream (tail -f style)
+  validate/          Config file pre-flight validation
+  snapshot_diff/     Compare two snapshot JSON files
+  info/              Quick system info summary
   gui/               Qt5 dashboard
   config/            Simple INI-style config store + hot-reload watcher
   platform/          OS/arch detection

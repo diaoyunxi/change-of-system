@@ -6,6 +6,9 @@
 #include <string>
 
 namespace changeos {
+
+class MonitorEngine;
+
 namespace tail {
 
 struct TailOptions {
@@ -29,7 +32,7 @@ public:
     // 启动 MonitorEngine 后调用此函数进入实时事件流模式。
     // 阻塞直到 g_running 被置为 false（例如 Ctrl+C）。
     // 返回退出码（0 表示正常结束）。
-    static int run(class MonitorEngine& engine, const TailOptions& opts,
+    static int run(::changeos::MonitorEngine& engine, const TailOptions& opts,
                    std::atomic<bool>& running);
 };
 

@@ -2,6 +2,69 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-07-01
+
+### Added
+
+#### Live Tail Mode
+- **Tail Watcher**: 实时事件流，类似 `tail -f`
+  - 启动所有监控器后将新事件实时打印到 stdout
+  - 支持按类别（`--tail-category`）、来源（`--tail-source`）、关键字（`--tail-keyword`）过滤
+  - 可选 ANSI 颜色输出（`--tail-color`），按事件严重程度着色（删除/严重=红、新增=绿、修改=黄、用户=青）
+  - 可选 JSON 行输出（`--tail-json`），每行一个 JSON 对象，便于 `jq` 管道处理
+  - `--tail-recent <n>` 可在开始流式输出前先打印最近 N 条历史事件
+  - 按 Ctrl+C 干净退出
+
+#### Config Validation
+- **Config Validator**: 启动前预检配置文件
+  - 语法检查：缺失 `=`、空键、重复键
+  - 类型检查：布尔、整数、浮点、端口列表（0-65535）
+  - 语义检查：阈值关系（warning < critical）、轮询间隔为正、< 100ms 给出 CPU 占用警告、reporting/webhook 启用时端点非空、URL 协议合法等
+  - 未知键检测：拼写错误的配置键会给出提示
+  - 命令行：`--validate-config [path]`（路径优先级：参数 > -c > config.ini）
+  - 退出码：0 = 通过，1 = 存在错误（脚本友好）
+  - 彩色输出区分 ERROR / WARN / INFO
+
+#### Snapshot Diff
+- **Snapshot Diff**: 对比两个快照 JSON 文件并输出差异
+  - 内置极简 JSON 解析器，无外部依赖
+  - 按主键（pid / port / device+mount / address / name）索引数组元素，智能匹配增删改
+  - 比较元数据（host / platform / architecture / user / uptime）
+  - 比较 sections：system（对象字段）、disks / processes / connections / listening_ports（数组）、environment
+  - 文本输出含进度条式摘要与可选详细条目（`--snapshot-diff-verbose`）
+  - JSON 输出（`--snapshot-diff-json`）便于程序化处理
+  - 退出码：0 = 无差异，1 = 存在差异，2 = 错误（文件无法读取等）
+  - 适用于基线漂移检测、变更审计、前后对比
+
+#### System Info
+- **System Info**: 一键式系统信息概览（类似 neofetch 的快速摘要）
+  - 元数据：时间、主机名、用户、OS 发行版、内核版本、平台/架构、运行时间
+  - CPU：型号、核心数、当前频率
+  - 系统负载：1/5/15 分钟
+  - 内存：总量/已用/可用 + 使用率进度条
+  - 磁盘：每个挂载点的总量/已用/可用 + 使用率进度条
+  - 概要：进程数、监听端口数
+  - 命令行：`--info [section]`（section 可选 `json` 或 `color`）
+  - 也支持 `--info-json` / `--info-color` 独立标志
+  - 彩色模式按使用率着色（≥95% 红、≥80% 黄、其余绿）
+
+### Changed
+- Bumped project version to 0.4.0
+- 新增模块：`tail/`、`validate/`、`snapshot_diff/`、`info/`
+- 新增 CLI 标志：`--tail`、`--tail-category`、`--tail-source`、`--tail-keyword`、
+  `--tail-recent`、`--tail-color`、`--tail-json`、`--validate-config`、
+  `--snapshot-diff`、`--snapshot-diff-json`、`--snapshot-diff-verbose`、
+  `--info`、`--info-json`、`--info-color`
+- 新增的 one-shot 命令（`--validate-config`、`--snapshot-diff`、`--info`）跳过启动更新检查
+- 在 tail 模式下不再注册默认 stdout 事件回调，避免事件被重复打印
+
+### Technical Details
+- 新类：`TailWatcher`、`ConfigValidator`、`SnapshotDiff`、`SystemInfo`
+- `tail/` 复用 `MonitorEngine::on_event()` 与 `recent_events()`，无侵入式改动
+- `validate/` 独立解析配置文件（不修改全局 `ConfigStore`），内置已知键表与类型校验
+- `snapshot_diff/` 自带 JSON 解析器，不依赖第三方库
+- `info/` 直接读取 `/proc/{cpuinfo,meminfo,loadavg,mounts,sys/kernel/osrelease}`、`/etc/os-release`、`sysconf`、`statvfs`，无监控器启动开销
+
 ## [0.3.0] - 2026-06-30
 
 ### Added
