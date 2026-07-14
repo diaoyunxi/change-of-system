@@ -21,6 +21,9 @@
 
 namespace changeos {
 
+/// 事件缓存上限，防止长期运行内存无限增长
+static constexpr std::size_t kMaxRecentEvents = 5000;
+
 MonitorEngine::MonitorEngine() = default;
 MonitorEngine::~MonitorEngine() {
     stop_all();
@@ -317,8 +320,8 @@ void MonitorEngine::route_event(const Event& event) {
     {
         std::lock_guard<std::mutex> lock(recent_mutex_);
         recent_.push_back(filtered_event);
-        if (recent_.size() > 5000) recent_.erase(recent_.begin(),
-                                                 recent_.end() - 5000);
+        if (recent_.size() > kMaxRecentEvents) recent_.erase(recent_.begin(),
+                                                                recent_.end() - kMaxRecentEvents);
     }
 
     std::vector<EventCallback> snapshot;

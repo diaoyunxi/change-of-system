@@ -3,6 +3,7 @@
 #include <cstring>
 #include <sstream>
 #include <thread>
+#include <mutex>
 
 #if defined(COS_PLATFORM_LINUX) || defined(COS_PLATFORM_UNIX) || defined(COS_PLATFORM_ANDROID)
 #include <sys/utsname.h>
@@ -22,6 +23,15 @@
 
 namespace changeos {
 namespace platform {
+
+// getenv 在多线程环境下非线程安全（POSIX 标准仅要求异步信号安全），
+// 使用互斥锁保护 getenv 调用。
+namespace {
+std::mutex& env_mutex() {
+    static std::mutex m;
+    return m;
+}
+} // namespace
 
 Type current() {
 #if defined(COS_PLATFORM_ANDROID)
@@ -129,7 +139,11 @@ std::string username() {
     if (pw && pw->pw_name) {
         std::strncpy(buffer, pw->pw_name, sizeof(buffer) - 1);
     } else {
-        const char* user_env = std::getenv("USER");
+        const char* user_env = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(env_mutex());
+            user_env = std::getenv("USER");
+        }
         if (user_env) {
             std::strncpy(buffer, user_env, sizeof(buffer) - 1);
         }

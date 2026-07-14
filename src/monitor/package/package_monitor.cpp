@@ -1,11 +1,11 @@
 #include "monitor/package/package_monitor.h"
 #include "utils/periodic_runner.h"
 
-#include <fstream>
-#include <sstream>
 #include <cstdlib>
 #include <memory>
 #include <chrono>
+#include <string>
+#include <unistd.h>
 
 namespace changeos {
 namespace monitor {
@@ -35,26 +35,32 @@ bool PackageMonitor::on_stop() {
     return true;
 }
 
+/// 检查给定命令是否存在于 PATH 中（使用 access 替代 system("command -v ...")）。
+static bool command_exists(const char* name) {
+    // 遍历常见路径检查可执行文件是否存在
+    static const char* paths[] = {
+        "/usr/bin/", "/usr/sbin/", "/bin/", "/sbin/",
+        "/usr/local/bin/", "/usr/local/sbin/",
+        "/opt/homebrew/bin/", nullptr
+    };
+    for (int i = 0; paths[i] != nullptr; ++i) {
+        std::string full = std::string(paths[i]) + name;
+        if (access(full.c_str(), X_OK) == 0) return true;
+    }
+    return false;
+}
+
 PackageMonitor::PackageManager PackageMonitor::detect_package_manager() {
 #if defined(__linux__)
-    // Check for package managers in order of preference
-    if (std::system("command -v apt >/dev/null 2>&1") == 0) {
-        return PackageManager::APT;
-    } else if (std::system("command -v dnf >/dev/null 2>&1") == 0) {
-        return PackageManager::DNF;
-    } else if (std::system("command -v yum >/dev/null 2>&1") == 0) {
-        return PackageManager::YUM;
-    } else if (std::system("command -v pacman >/dev/null 2>&1") == 0) {
-        return PackageManager::PACMAN;
-    } else if (std::system("command -v zypper >/dev/null 2>&1") == 0) {
-        return PackageManager::ZYPPER;
-    }
+    // 检查包管理器（优先级从高到低）
+    if (command_exists("apt"))        return PackageManager::APT;
+    if (command_exists("dnf"))        return PackageManager::DNF;
+    if (command_exists("yum"))        return PackageManager::YUM;
+    if (command_exists("pacman"))     return PackageManager::PACMAN;
+    if (command_exists("zypper"))     return PackageManager::ZYPPER;
 #elif defined(__APPLE__)
-    if (std::system("command -v brew >/dev/null 2>&1") == 0) {
-        return PackageManager::BREW;
-    } else if (std::system("command -v port >/dev/null 2>&1") == 0) {
-        return PackageManager::PORT;
-    }
+    if (command_exists("brew"))       return PackageManager::BREW;
+    if (command_exists("port"))       return PackageManager::PORT;
 #endif
     return PackageManager::Unknown;
 }

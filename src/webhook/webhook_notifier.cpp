@@ -189,6 +189,16 @@ bool WebhookNotifier::send_webhook(const std::string& name, const WebhookPayload
     headers["Content-Type"] = "application/json";
     headers["User-Agent"] = "change-of-system/1.0";
 
+    // 日志中脱敏 Authorization 头，避免凭证泄露
+    std::string log_headers_summary;
+    for (const auto& kv : headers) {
+        if (kv.first == "Authorization") {
+            log_headers_summary += kv.first + ": [REDACTED], ";
+        } else {
+            log_headers_summary += kv.first + ": " + kv.second + ", ";
+        }
+    }
+
     int http_status = 0;
     std::string error;
     bool success = false;
@@ -377,6 +387,10 @@ bool WebhookNotifier::http_post(const std::string& url, const std::string& body,
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, timeout_ms);
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+    // SSL 证书验证默认启用（安全最佳实践）
+    // 仅在测试环境可通过配置关闭
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
 
     CURLcode res = curl_easy_perform(curl);
 

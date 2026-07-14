@@ -63,7 +63,13 @@ std::vector<UserSession> UserActivityMonitor::snapshot() {
                 sess.tty.pop_back();
             }
 
+            // 使用 strnlen 确保不越界读取未终止的字符串
             std::string host = line.substr(44, 16);
+            // 截断到第一个空字符（如果有的话）
+            auto null_pos = host.find('\0');
+            if (null_pos != std::string::npos) {
+                host = host.substr(0, null_pos);
+            }
             while (!host.empty() && host.back() == ' ') {
                 host.pop_back();
             }

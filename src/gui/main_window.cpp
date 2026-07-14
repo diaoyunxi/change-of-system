@@ -92,10 +92,10 @@ void MainWindow::toggle_monitoring() {
 
 void MainWindow::refresh_events() {
     auto events = engine_->recent_events(500);
-    int displayed = event_list_->count();
 
-    for (int i = displayed; i < static_cast<int>(events.size()); ++i) {
-        const auto& e = events[static_cast<std::size_t>(i)];
+    // 清空并重新填充事件列表，确保与引擎状态同步
+    event_list_->clear();
+    for (const auto& e : events) {
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
             e.timestamp.time_since_epoch()).count();
         QDateTime dt = QDateTime::fromMSecsSinceEpoch(
@@ -108,6 +108,7 @@ void MainWindow::refresh_events() {
         event_list_->addItem(line);
     }
 
+    // 限制列表大小，防止 GUI 内存无限增长
     while (event_list_->count() > 1000) {
         delete event_list_->takeItem(0);
     }

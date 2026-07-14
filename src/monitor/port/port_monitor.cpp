@@ -57,7 +57,9 @@ std::map<int, PortMonitor::PortInfo> PortMonitor::snapshot_ports() {
             if (colon_pos == std::string::npos) continue;
 
             std::string port_hex = local_addr.substr(colon_pos + 1);
-            int port = std::stoi(port_hex, nullptr, 16);
+            int port = 0;
+            try { port = std::stoi(port_hex, nullptr, 16); }
+            catch (...) { continue; }
 
             // Only track ports we're interested in
             if (watch_ports_.find(port) == watch_ports_.end()) continue;

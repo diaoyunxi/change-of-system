@@ -105,6 +105,10 @@ int EventQuery::run(storage::Storage* storage, const QueryOptions& opts) {
 
     int offset = std::max(0, opts.offset);
     int limit = opts.limit > 0 ? opts.limit : static_cast<int>(matches.size());
+    // 防御性检查：limit 为负数视为不限制
+    if (opts.limit < 0) {
+        limit = static_cast<int>(matches.size());
+    }
     if (offset >= static_cast<int>(matches.size())) {
         if (!opts.json_output) {
             std::printf("Query returned 0 events (offset=%d, total_matches=%zu)\n",

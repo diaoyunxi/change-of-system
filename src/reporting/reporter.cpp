@@ -3,11 +3,37 @@
 #include "utils/logger.h"
 
 #include <chrono>
+#include <cstdio>
 #include <sstream>
 #include <string>
 
 namespace changeos {
 namespace reporting {
+
+namespace {
+
+std::string json_escape_str(const std::string& s) {
+    std::string out;
+    out.reserve(s.size() + 8);
+    for (char c : s) {
+        switch (c) {
+            case '"':  out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default:
+                if (static_cast<unsigned char>(c) < 0x20) {
+                    char buf[8];
+                    std::snprintf(buf, sizeof(buf), "\\u%04x", c);
+                    out += buf;
+                } else out += c;
+        }
+    }
+    return out;
+}
+
+} // anonymous namespace
 
 Reporter::Reporter() = default;
 Reporter::~Reporter() { stop(); }
@@ -91,16 +117,16 @@ std::string Reporter::serialize(const std::vector<Event>& events) {
     oss << "[\n";
     for (size_t i = 0; i < events.size(); ++i) {
         const auto& e = events[i];
-        oss << "  {";
-        oss << "\"ts\":" << to_unix_ms(e.timestamp) << ",";
-        oss << "\"category\":\"" << category_name(e.category) << "\",";
-        oss << "\"type\":\"" << type_name(e.type) << "\",";
-        oss << "\"source\":\"" << e.source << "\",";
-        oss << "\"target\":\"" << e.target << "\",";
-        oss << "\"host\":\"" << e.host << "\",";
-        oss << "\"platform\":\"" << e.platform << "\",";
-        oss << "\"summary\":\"" << e.summary << "\"";
-        oss << "}";
+        oss << "  {\n";
+        oss << "    \"ts\":" << to_unix_ms(e.timestamp) << ",";
+        oss << "\"category\":\"" << json_escape_str(category_name(e.category)) << "\",";
+        oss << "\"type\":\"" << json_escape_str(type_name(e.type)) << "\",";
+        oss << "\"source\":\"" << json_escape_str(e.source) << "\",";
+        oss << "\"target\":\"" << json_escape_str(e.target) << "\",";
+        oss << "\"host\":\"" << json_escape_str(e.host) << "\",";
+        oss << "\"platform\":\"" << json_escape_str(e.platform) << "\",";
+        oss << "\"summary\":\"" << json_escape_str(e.summary) << "\"\n";
+        oss << "  }";
         if (i + 1 < events.size()) oss << ",";
         oss << "\n";
     }

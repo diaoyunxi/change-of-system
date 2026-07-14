@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <chrono>
 #include <ctime>
+#include <cstdio>
 
 namespace changeos {
 namespace export_ {
@@ -43,6 +44,31 @@ std::string EventExporter::escape_csv_field(const std::string& field) {
     }
     escaped += "\"";
     return escaped;
+}
+
+std::string EventExporter::json_escape(const std::string& s) {
+    std::string out;
+    out.reserve(s.size() + 8);
+    for (char c : s) {
+        switch (c) {
+            case '"':  out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\b': out += "\\b"; break;
+            case '\f': out += "\\f"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default:
+                if (static_cast<unsigned char>(c) < 0x20) {
+                    char buf[8];
+                    std::snprintf(buf, sizeof(buf), "\\u%04x", c);
+                    out += buf;
+                } else {
+                    out += c;
+                }
+        }
+    }
+    return out;
 }
 
 bool EventExporter::export_to_csv(const std::vector<Event>& events, 
@@ -95,20 +121,20 @@ bool EventExporter::export_to_json(const std::vector<Event>& events,
         file << "  {\n";
         file << "    \"id\": " << event.id << ",\n";
         file << "    \"timestamp\": \"" << format_timestamp(event.timestamp) << "\",\n";
-        file << "    \"category\": \"" << category_name(event.category) << "\",\n";
-        file << "    \"type\": \"" << type_name(event.type) << "\",\n";
-        file << "    \"source\": \"" << event.source << "\",\n";
-        file << "    \"target\": \"" << event.target << "\",\n";
-        file << "    \"summary\": \"" << event.summary << "\",\n";
-        file << "    \"host\": \"" << event.host << "\",\n";
-        file << "    \"platform\": \"" << event.platform << "\",\n";
+        file << "    \"category\": \"" << json_escape(category_name(event.category)) << "\",\n";
+        file << "    \"type\": \"" << json_escape(type_name(event.type)) << "\",\n";
+        file << "    \"source\": \"" << json_escape(event.source) << "\",\n";
+        file << "    \"target\": \"" << json_escape(event.target) << "\",\n";
+        file << "    \"summary\": \"" << json_escape(event.summary) << "\",\n";
+        file << "    \"host\": \"" << json_escape(event.host) << "\",\n";
+        file << "    \"platform\": \"" << json_escape(event.platform) << "\",\n";
         
         // Attributes object
         file << "    \"attributes\": {";
         bool first = true;
         for (const auto& [key, value] : event.attributes) {
             if (!first) file << ",";
-            file << "\n      \"" << key << "\": \"" << value << "\"";
+            file << "\n      \"" << json_escape(key) << "\": \"" << json_escape(value) << "\"";
             first = false;
         }
         if (!event.attributes.empty()) {

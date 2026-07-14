@@ -183,6 +183,11 @@ void AlertManager::trigger_alert(const AlertRule& rule, const Event& event) {
         std::lock_guard<std::mutex> lock(mutex_);
         alerts_.push_back(alert);
         last_triggered_[rule.name] = alert.timestamp;
+        // 限制告警历史数量，防止长期运行内存无限增长
+        static constexpr std::size_t kMaxAlerts = 10000;
+        if (alerts_.size() > kMaxAlerts) {
+            alerts_.erase(alerts_.begin(), alerts_.end() - kMaxAlerts);
+        }
         callbacks_copy = callbacks_;
     }
 

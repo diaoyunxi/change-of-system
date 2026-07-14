@@ -197,12 +197,23 @@ private:
 
 // ----------------- 工具函数 -------------
 
+// 读取文件内容到字符串。对大文件（>100MB）拒绝处理以避免 OOM。
+static constexpr std::int64_t kMaxFileSize = 100 * 1024 * 1024; // 100MB
+
 bool read_file(const std::string& path, std::string& out) {
     std::ifstream f(path, std::ios::binary);
     if (!f) return false;
-    std::ostringstream oss;
-    oss << f.rdbuf();
-    out = oss.str();
+    // 获取文件大小，超过限制则拒绝
+    f.seekg(0, std::ios::end);
+    auto size = f.tellg();
+    if (size < 0) return false;
+    if (size > kMaxFileSize) {
+        return false;
+    }
+    f.seekg(0, std::ios::beg);
+    out.resize(static_cast<std::size_t>(size));
+    f.read(&out[0], size);
+    if (!f) return false;
     return true;
 }
 
@@ -375,11 +386,36 @@ int SnapshotDiff::run(const DiffOptions& opts) {
 
     std::string text_a, text_b;
     if (!read_file(opts.path_a, text_a)) {
-        std::cerr << "错误: 无法读取快照 A: " << opts.path_a << "\n";
+        std::cerr << "错误: 无法读取快照 A: " << opts.path_a;
+        {
+            // 检查是否因文件过大
+            std::ifstream f(opts.path_a, std::ios::binary);
+            if (f) {
+                f.seekg(0, std::ios::end);
+                auto sz = f.tellg();
+                if (sz > kMaxFileSize) {
+                    std::cerr << "（文件过大: " << (sz / (1024 * 1024)) << "MB，上限 "
+                              << (kMaxFileSize / (1024 * 1024)) << "MB）";
+                }
+            }
+        }
+        std::cerr << "\n";
         return 2;
     }
     if (!read_file(opts.path_b, text_b)) {
-        std::cerr << "错误: 无法读取快照 B: " << opts.path_b << "\n";
+        std::cerr << "错误: 无法读取快照 B: " << opts.path_b;
+        {
+            std::ifstream f(opts.path_b, std::ios::binary);
+            if (f) {
+                f.seekg(0, std::ios::end);
+                auto sz = f.tellg();
+                if (sz > kMaxFileSize) {
+                    std::cerr << "（文件过大: " << (sz / (1024 * 1024)) << "MB，上限 "
+                              << (kMaxFileSize / (1024 * 1024)) << "MB）";
+                }
+            }
+        }
+        std::cerr << "\n";
         return 2;
     }
 

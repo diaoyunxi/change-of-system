@@ -44,8 +44,8 @@ bool Daemon::daemonize() {
         exit(EXIT_SUCCESS);
     }
 
-    // Set file mode creation mask
-    umask(0);
+    // Set file mode creation mask (restrictive: only owner has permissions)
+    umask(0077);
 
     // Change working directory
     if (chdir("/") < 0) {

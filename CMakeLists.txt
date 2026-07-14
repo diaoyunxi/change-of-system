@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(change-of-system
-    VERSION 0.4.0
+    VERSION 0.5.0
     DESCRIPTION "Cross-platform system change monitor"
     LANGUAGES CXX C
 )

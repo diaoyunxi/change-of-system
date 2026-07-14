@@ -24,6 +24,7 @@ public:
     
 private:
     static std::string escape_csv_field(const std::string& field);
+    static std::string json_escape(const std::string& s);
     static std::string format_timestamp(Timestamp ts);
 };
 
