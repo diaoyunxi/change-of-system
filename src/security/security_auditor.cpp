@@ -2,6 +2,7 @@
 #include "utils/logger.h"
 
 #include <algorithm>
+#include <set>
 #include <sstream>
 
 namespace changeos {
@@ -106,46 +107,52 @@ void SecurityAuditor::process_event(const Event& event) {
     }
 }
 
-void SecurityAuditor::analyze_authentication_event(const Event& event) {
-    // Check for failed login patterns
-    if (event.summary.find("failed") != std::string::npos ||
-        event.summary.find("failure") != std::string::npos ||
-        event.summary.find("authentication failure") != std::string::npos) {
-
-        SecurityEvent se;
-        se.timestamp = now();
-        se.type = SecurityEventType::FailedLogin;
-        se.source = event.source;
-        se.target = event.target;
-        se.summary = "Authentication failure detected: " + event.summary;
-        se.severity = 2;
-        se.details = event.attributes;
-        report_security_event(se);
-    }
-}
-
 void SecurityAuditor::analyze_file_event(const Event& event) {
-    // Check for sensitive file access
-    static const std::vector<std::string> sensitive_paths = {
+    // 敏感文件路径列表，使用精确匹配而非子串匹配
+    // 以 '/' 结尾的路径使用前缀匹配（目录），其他使用精确匹配
+    static const std::vector<std::string> sensitive_dirs = {
+        "/root/", "/.ssh/", "/etc/cron."
+    };
+    static const std::vector<std::string> sensitive_files = {
         "/etc/passwd", "/etc/shadow", "/etc/sudoers",
-        "/etc/ssh/sshd_config", "/root/", "/.ssh/",
-        "/etc/crontab", "/etc/cron.", "/var/log/auth"
+        "/etc/ssh/sshd_config", "/etc/crontab", "/var/log/auth"
     };
 
-    for (const auto& path : sensitive_paths) {
-        if (event.target.find(path) != std::string::npos) {
-            SecurityEvent se;
-            se.timestamp = now();
-            se.type = SecurityEventType::SensitiveFileAccess;
-            se.source = event.source;
-            se.target = event.target;
-            se.summary = "Sensitive file access: " + event.target;
-            se.severity = 3;
-            se.details["event_type"] = type_name(event.type);
-            se.details["original_summary"] = event.summary;
-            report_security_event(se);
+    bool is_sensitive = false;
+
+    // 目录前缀匹配（路径以敏感目录开头）
+    for (const auto& dir : sensitive_dirs) {
+        if (event.target.size() >= dir.size() &&
+            event.target.compare(0, dir.size(), dir) == 0) {
+            is_sensitive = true;
             break;
         }
+    }
+
+    // 精确文件路径匹配（或路径前缀 + '/' 表示子路径）
+    if (!is_sensitive) {
+        for (const auto& file : sensitive_files) {
+            if (event.target == file ||
+                (event.target.size() > file.size() &&
+                 event.target.compare(0, file.size(), file) == 0 &&
+                 event.target[file.size()] == '/')) {
+                is_sensitive = true;
+                break;
+            }
+        }
+    }
+
+    if (is_sensitive) {
+        SecurityEvent se;
+        se.timestamp = now();
+        se.type = SecurityEventType::SensitiveFileAccess;
+        se.source = event.source;
+        se.target = event.target;
+        se.summary = "Sensitive file access: " + event.target;
+        se.severity = 3;
+        se.details["event_type"] = type_name(event.type);
+        se.details["original_summary"] = event.summary;
+        report_security_event(se);
     }
 
     // Check for SUID bit changes
@@ -166,8 +173,8 @@ void SecurityAuditor::analyze_file_event(const Event& event) {
 }
 
 void SecurityAuditor::analyze_process_event(const Event& event) {
-    // Check for suspicious process names
-    static const std::vector<std::string> suspicious_names = {
+    // 可疑进程完整名称列表，使用完整进程名匹配而非子串匹配
+    static const std::set<std::string> suspicious_names = {
         "nc", "ncat", "netcat", "nc.exe",
         "nmap", "masscan", "zmap",
         "meterpreter", "metasploit",
@@ -175,23 +182,26 @@ void SecurityAuditor::analyze_process_event(const Event& event) {
         "rootkit", "backdoor"
     };
 
+    // 提取进程名（取路径的最后一部分），进行完整名称匹配
     std::string proc_name = event.target;
+    auto last_slash = proc_name.find_last_of('/');
+    if (last_slash != std::string::npos) {
+        proc_name = proc_name.substr(last_slash + 1);
+    }
     std::transform(proc_name.begin(), proc_name.end(), proc_name.begin(), ::tolower);
 
-    for (const auto& name : suspicious_names) {
-        if (proc_name.find(name) != std::string::npos) {
-            SecurityEvent se;
-            se.timestamp = now();
-            se.type = SecurityEventType::SuspiciousProcess;
-            se.source = event.source;
-            se.target = event.target;
-            se.summary = "Suspicious process detected: " + event.target;
-            se.severity = 4;
-            se.details["matched_pattern"] = name;
-            se.details["original_summary"] = event.summary;
-            report_security_event(se);
-            break;
-        }
+    // 使用精确匹配替代子串匹配，避免 "nc" 误匹配 "sync" 等进程
+    if (suspicious_names.count(proc_name)) {
+        SecurityEvent se;
+        se.timestamp = now();
+        se.type = SecurityEventType::SuspiciousProcess;
+        se.source = event.source;
+        se.target = event.target;
+        se.summary = "Suspicious process detected: " + event.target;
+        se.severity = 4;
+        se.details["matched_pattern"] = proc_name;
+        se.details["original_summary"] = event.summary;
+        report_security_event(se);
     }
 
     // Check for privilege escalation

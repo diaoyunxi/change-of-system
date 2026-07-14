@@ -86,7 +86,14 @@ void NetworkMonitor::tick() {
     std::set<std::string> previous_keys;
 
     for (auto& c : current) current_keys.insert(make_key(c));
-    for (auto& c : previous_connections_) previous_keys.insert(make_key(c));
+
+    // 在锁内读取 previous_connections_ 的副本，避免无锁读取导致的数据竞争
+    std::vector<NetworkConnection> previous_copy;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        previous_copy = previous_connections_;
+    }
+    for (auto& c : previous_copy) previous_keys.insert(make_key(c));
 
     if (!first_scan_.exchange(false)) {
         for (auto& c : current) {
@@ -109,7 +116,8 @@ void NetworkMonitor::tick() {
             }
         }
 
-        for (auto& c : previous_connections_) {
+        // 使用锁内复制的 previous_copy，避免在迭代过程中数据被其他线程修改
+        for (auto& c : previous_copy) {
             std::string key = make_key(c);
             if (current_keys.find(key) == current_keys.end()) {
                 Event ev;

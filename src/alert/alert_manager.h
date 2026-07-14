@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <atomic>
 #include <functional>
 #include <map>
 #include <memory>
@@ -58,7 +59,12 @@ struct AlertRule {
     // Custom condition function
     std::function<bool(const Event&)> custom_condition;
 
-    std::string message_template;  // {{source}}, {{target}}, {{summary}}
+    std::string message_template;  // {{source}}, {{target}}, {{summary}}, {{category}}, {{type}}, {{threshold_count}}, {{threshold_window_ms}}
+
+    // 预编译的正则表达式（缓存，避免每次匹配时重新编译）
+    std::shared_ptr<std::regex> compiled_source;
+    std::shared_ptr<std::regex> compiled_target;
+    std::shared_ptr<std::regex> compiled_summary;
 };
 
 class AlertManager {
@@ -94,7 +100,7 @@ public:
 private:
     bool matches_rule(const AlertRule& rule, const Event& event);
     void trigger_alert(const AlertRule& rule, const Event& event);
-    std::string format_message(const std::string& tmpl, const Event& event);
+    std::string format_message(const std::string& tmpl, const Event& event, const AlertRule& rule);
     bool is_in_cooldown(const std::string& rule_name);
 
     mutable std::mutex mutex_;
@@ -106,7 +112,8 @@ private:
     std::map<std::string, std::vector<Timestamp>> rule_events_;
     std::map<std::string, Timestamp> last_triggered_;
 
-    std::uint64_t next_alert_id_ = 1;
+    // 使用 std::atomic 保证线程安全的 ID 自增
+    std::atomic<std::uint64_t> next_alert_id_{1};
 };
 
 // Predefined alert rules factory

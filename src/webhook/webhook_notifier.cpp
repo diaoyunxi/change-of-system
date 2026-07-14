@@ -8,6 +8,8 @@
 #include <iomanip>
 #include <sstream>
 #include <thread>
+#include <openssl/hmac.h>
+#include <openssl/evp.h>
 #ifdef COS_USE_REMOTE_REPORTING
 #include <curl/curl.h>
 #endif
@@ -21,9 +23,15 @@ std::string timestamp_to_iso8601(std::chrono::system_clock::time_point tp) {
     auto time = std::chrono::system_clock::to_time_t(tp);
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         tp.time_since_epoch()) % 1000;
-    std::tm tm = *std::gmtime(&time);
+    // 使用线程安全的 gmtime_r（POSIX）或 gmtime_s（Windows）替代 std::gmtime
+    struct tm tm_buf;
+#if defined(_WIN32) || defined(_MSC_VER)
+    gmtime_s(&tm_buf, &time);
+#else
+    gmtime_r(&time, &tm_buf);
+#endif
     char buf[32];
-    std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &tm);
+    std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &tm_buf);
     std::string result = buf;
     result += "." + std::to_string(ms.count()) + "Z";
     return result;
@@ -166,12 +174,13 @@ bool WebhookNotifier::send_webhook(const std::string& name, const WebhookPayload
     {
         std::lock_guard<std::mutex> lock(mutex_);
         auto it = std::find_if(webhooks_.begin(), webhooks_.end(),
-        [&name](const WebhookConfig& w) { return w.name == name; });
-    if (it == webhooks_.end()) {
-        COS_LOG_ERROR("Webhook not found: " + name);
-        return false;
-    }
-    config = *it;
+            [&name](const WebhookConfig& w) { return w.name == name; });
+        if (it == webhooks_.end()) {
+            COS_LOG_ERROR("Webhook not found: " + name);
+            return false;
+        }
+        // 将 config 赋值移到锁内，避免迭代器在锁释放后失效
+        config = *it;
     }
 
     if (!config.enabled) {
@@ -356,12 +365,22 @@ std::string WebhookNotifier::serialize_payload(const WebhookPayload& payload) {
 }
 
 std::string WebhookNotifier::compute_signature(const std::string& secret, const std::string& data) {
-    // Simple HMAC-SHA256-like signature
-    // In production, use proper HMAC implementation
-    std::string combined = secret + data + secret;
-    std::hash<std::string> hasher;
+    // 使用 OpenSSL HMAC-SHA256 计算签名，替代不安全的 std::hash
+    unsigned char* result = HMAC(
+        EVP_sha256(),
+        secret.c_str(), static_cast<int>(secret.size()),
+        reinterpret_cast<const unsigned char*>(data.c_str()), data.size(),
+        nullptr, nullptr);
+    if (!result) {
+        COS_LOG_ERROR("HMAC-SHA256 签名计算失败");
+        return "";
+    }
+    // 将 32 字节的 HMAC 输出转换为十六进制字符串
     std::stringstream ss;
-    ss << std::hex << hasher(combined);
+    ss << std::hex << std::setfill('0');
+    for (int i = 0; i < 32; ++i) {
+        ss << std::setw(2) << static_cast<unsigned int>(result[i]);
+    }
     return ss.str();
 }
 

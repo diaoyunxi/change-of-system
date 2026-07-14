@@ -103,11 +103,15 @@ public:
         path_ = connection_string;
         file_.open(path_, std::ios::app);
         if (file_.is_open()) {
-            // Seed the byte counter from the existing file size so rotation
-            // works correctly across restarts.
+            // 从现有文件大小初始化字节计数器，使轮转在重启后正常工作
             std::error_code ec;
             auto sz = std::filesystem::file_size(path_, ec);
             bytes_written_ = ec ? 0 : static_cast<std::int64_t>(sz);
+            // 从现有文件初始化事件计数器，避免每次 count() 都遍历文件
+            event_count_ = 0;
+            std::ifstream in(path_);
+            std::string line;
+            while (std::getline(in, line)) if (!line.empty()) ++event_count_;
         }
         return file_.is_open();
     }
@@ -130,11 +134,8 @@ public:
 
     std::int64_t count() const override {
         std::lock_guard<std::mutex> lock(mutex_);
-        std::ifstream in(path_);
-        std::int64_t c = 0;
-        std::string line;
-        while (std::getline(in, line)) if (!line.empty()) ++c;
-        return c;
+        // 使用内存计数器，避免每次调用都遍历整个文件
+        return event_count_;
     }
 
     void insert(const Event& event) override {
@@ -144,9 +145,12 @@ public:
         file_ << line << "\n";
         file_.flush();
         bytes_written_ += static_cast<std::int64_t>(line.size()) + 1;
+        ++event_count_;  // 维护内存事件计数器
         maybe_rotate_locked();
     }
 
+    // 注意：当前 query() 采用全文件线性扫描，无时间戳索引。
+    // 对于大规模数据场景，建议使用 SQLite 存储后端或添加时间戳索引文件以提升查询性能。
     std::vector<Event> query(const QueryFilter& filter) const override {
         std::vector<Event> result;
         std::lock_guard<std::mutex> lock(mutex_);
@@ -185,18 +189,46 @@ public:
 
     void prune(std::int64_t max_events) override {
         std::lock_guard<std::mutex> lock(mutex_);
+        // 使用内存计数器判断是否需要裁剪，避免不必要的文件遍历
+        if (event_count_ <= max_events) return;
+
+        std::int64_t skip = event_count_ - max_events;
+
+        // 使用临时文件流式写入保留的事件，避免全量加载到内存
+        std::string tmp_path = path_ + ".prune.tmp";
         std::ifstream in(path_);
         if (!in) return;
-        std::vector<std::string> lines;
+        std::ofstream out(tmp_path, std::ios::trunc);
+        if (!out) {
+            in.close();
+            return;
+        }
+
+        std::int64_t current = 0;
+        std::int64_t new_bytes = 0;
         std::string line;
-        while (std::getline(in, line)) if (!line.empty()) lines.push_back(line);
-        if (static_cast<std::int64_t>(lines.size()) <= max_events) return;
-        std::vector<std::string> keep(lines.end() - max_events, lines.end());
+        while (std::getline(in, line)) {
+            if (line.empty()) continue;
+            if (current++ < skip) continue;  // 跳过旧事件
+            out << line << "\n";
+            new_bytes += static_cast<std::int64_t>(line.size()) + 1;
+        }
         in.close();
-        std::ofstream out(path_, std::ios::trunc);
-        for (auto& l : keep) out << l << "\n";
-        bytes_written_ = 0;
-        for (auto& l : keep) bytes_written_ += static_cast<std::int64_t>(l.size()) + 1;
+        out.close();
+
+        // 关闭当前写入文件，原子性替换原文件
+        if (file_.is_open()) file_.close();
+        std::error_code ec;
+        std::filesystem::rename(tmp_path, path_, ec);
+        if (ec) {
+            // 替换失败，清理临时文件并重新打开原文件
+            std::filesystem::remove(tmp_path, ec);
+            file_.open(path_, std::ios::app);
+            return;
+        }
+        file_.open(path_, std::ios::app);
+        bytes_written_ = new_bytes;
+        event_count_ = max_events;
     }
 
 private:
@@ -230,6 +262,7 @@ private:
         // Open a fresh file.
         file_.open(path_, std::ios::app);
         bytes_written_ = 0;
+        event_count_ = 0;  // 轮转后新文件为空，重置事件计数器
         if (!file_.is_open()) {
             COS_LOG_ERROR("Failed to reopen storage file after rotation: " + path_);
         } else {
@@ -243,13 +276,14 @@ private:
     std::string path_;
     std::ofstream file_;
     std::int64_t bytes_written_ = 0;
+    std::int64_t event_count_ = 0;  // 内存事件计数器，避免 count() 遍历整个文件
     std::int64_t rotate_max_bytes_ = 0;
     int rotate_max_files_ = 0;
 };
 
 } // namespace
 
-std::unique_ptr<Storage> create_sqlite_storage() {
+std::unique_ptr<Storage> create_default_storage() {
     return std::make_unique<FileStorage>();
 }
 

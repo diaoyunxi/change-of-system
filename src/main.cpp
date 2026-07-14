@@ -17,9 +17,15 @@
 #include <string>
 #include <thread>
 
+// 确保 COS_VERSION 宏已定义（由 CMake 传递，回退为 "unknown"）
+#ifndef COS_VERSION
+#define COS_VERSION "unknown"
+#endif
+
 namespace {
 
-static const char* VERSION = "0.4.0";
+/// 版本号（从 CMakeLists.txt 的 PROJECT_VERSION 宏获取，保证一致性）
+static const char* VERSION = COS_VERSION;
 
 std::atomic<bool> g_running{true};
 std::atomic<bool> g_reload_config{false};
@@ -78,8 +84,7 @@ void print_usage(const char* prog) {
         << "Platform: " << changeos::platform::name() << "\n";
 }
 
-// Returns true if any of the one-shot / non-interactive modes is requested,
-// so the update check can be skipped for them.
+// 检查是否为一次性/非交互模式（跳过更新检查）
 bool is_one_shot_mode(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
@@ -94,15 +99,8 @@ bool is_one_shot_mode(int argc, char** argv) {
     return false;
 }
 
-} // namespace
-
-int main(int argc, char** argv) {
-    // Skip the interactive update check for one-shot commands.
-    if (!is_one_shot_mode(argc, argv)) {
-        auto update_info = changeos::updater::check_for_update(VERSION);
-        changeos::updater::prompt_update(update_info);
-    }
-
+/// 命令行参数解析结果结构体
+struct ParsedArgs {
     std::string config_path;
     std::string export_path;
     std::string report_path;
@@ -117,7 +115,7 @@ int main(int argc, char** argv) {
     bool reload_config = false;
     bool daemon_mode = false;
 
-    // 新功能：tail / validate-config / snapshot-diff / info
+    // tail / validate-config / snapshot-diff / info
     bool tail_mode = false;
     changeos::tail::TailOptions tail_opts;
     bool validate_config_mode = false;
@@ -127,143 +125,171 @@ int main(int argc, char** argv) {
     bool info_mode = false;
     changeos::info::InfoOptions info_opts;
 
+    bool show_help = false;
+    bool show_version = false;
+    bool parse_error = false;
+};
+
+/// 解析命令行参数，提取到独立函数以降低 main() 复杂度
+ParsedArgs parse_args(int argc, char** argv) {
+    ParsedArgs args;
+
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "-h" || arg == "--help") {
-            print_usage(argv[0]);
-            return 0;
+            args.show_help = true;
         } else if (arg == "-V" || arg == "--version") {
-            std::cout << "change-of-system v" << VERSION << "\n";
-            return 0;
+            args.show_version = true;
         } else if ((arg == "-c" || arg == "--config") && i + 1 < argc) {
-            config_path = argv[++i];
+            args.config_path = argv[++i];
         } else if ((arg == "-d" || arg == "--daemon")) {
-            daemon_mode = true;
+            args.daemon_mode = true;
         } else if (arg == "--pid-file" && i + 1 < argc) {
-            pid_file = argv[++i];
+            args.pid_file = argv[++i];
         } else if (arg == "--export" && i + 1 < argc) {
-            export_path = argv[++i];
+            args.export_path = argv[++i];
         } else if (arg == "--report" && i + 1 < argc) {
-            report_path = argv[++i];
+            args.report_path = argv[++i];
         } else if (arg == "--reload-config") {
-            reload_config = true;
+            args.reload_config = true;
         } else if (arg == "--snapshot") {
-            snapshot_mode = true;
-            // Optional path argument: only consume if next token is not another flag.
+            args.snapshot_mode = true;
             if (i + 1 < argc && argv[i + 1][0] != '-') {
-                snapshot_path = argv[++i];
+                args.snapshot_path = argv[++i];
             }
         } else if (arg == "--diagnose") {
-            diagnose_mode = true;
+            args.diagnose_mode = true;
             if (i + 1 < argc && argv[i + 1][0] != '-') {
-                diagnose_path = argv[++i];
+                args.diagnose_path = argv[++i];
             }
         } else if (arg == "--query") {
-            query_mode = true;
+            args.query_mode = true;
             if (i + 1 < argc && argv[i + 1][0] != '-') {
-                query_keyword = argv[++i];
+                args.query_keyword = argv[++i];
             }
         } else if (arg == "--query-category" && i + 1 < argc) {
-            query_opts.category = argv[++i];
+            args.query_opts.category = argv[++i];
         } else if (arg == "--query-source" && i + 1 < argc) {
-            query_opts.source = argv[++i];
+            args.query_opts.source = argv[++i];
         } else if (arg == "--query-from" && i + 1 < argc) {
-            try { query_opts.from_unix_ms = std::stoll(argv[++i]); }
-            catch (...) { std::cerr << "Invalid --query-from value\n"; return 1; }
+            try { args.query_opts.from_unix_ms = std::stoll(argv[++i]); }
+            catch (...) { std::cerr << "Invalid --query-from value\n"; args.parse_error = true; }
         } else if (arg == "--query-to" && i + 1 < argc) {
-            try { query_opts.to_unix_ms = std::stoll(argv[++i]); }
-            catch (...) { std::cerr << "Invalid --query-to value\n"; return 1; }
+            try { args.query_opts.to_unix_ms = std::stoll(argv[++i]); }
+            catch (...) { std::cerr << "Invalid --query-to value\n"; args.parse_error = true; }
         } else if (arg == "--query-limit" && i + 1 < argc) {
-            try { query_opts.limit = std::stoi(argv[++i]); }
-            catch (...) { std::cerr << "Invalid --query-limit value\n"; return 1; }
+            try { args.query_opts.limit = std::stoi(argv[++i]); }
+            catch (...) { std::cerr << "Invalid --query-limit value\n"; args.parse_error = true; }
         } else if (arg == "--query-offset" && i + 1 < argc) {
-            try { query_opts.offset = std::stoi(argv[++i]); }
-            catch (...) { std::cerr << "Invalid --query-offset value\n"; return 1; }
+            try { args.query_opts.offset = std::stoi(argv[++i]); }
+            catch (...) { std::cerr << "Invalid --query-offset value\n"; args.parse_error = true; }
         } else if (arg == "--query-json") {
-            query_opts.json_output = true;
+            args.query_opts.json_output = true;
         } else if (arg == "--tail") {
-            tail_mode = true;
+            args.tail_mode = true;
         } else if (arg == "--tail-category" && i + 1 < argc) {
-            tail_opts.category_filter = argv[++i];
+            args.tail_opts.category_filter = argv[++i];
         } else if (arg == "--tail-source" && i + 1 < argc) {
-            tail_opts.source_filter = argv[++i];
+            args.tail_opts.source_filter = argv[++i];
         } else if (arg == "--tail-keyword" && i + 1 < argc) {
-            tail_opts.keyword_filter = argv[++i];
+            args.tail_opts.keyword_filter = argv[++i];
         } else if (arg == "--tail-recent" && i + 1 < argc) {
-            try { tail_opts.initial_recent = std::stoi(argv[++i]); }
-            catch (...) { std::cerr << "Invalid --tail-recent value\n"; return 1; }
+            try { args.tail_opts.initial_recent = std::stoi(argv[++i]); }
+            catch (...) { std::cerr << "Invalid --tail-recent value\n"; args.parse_error = true; }
         } else if (arg == "--tail-color") {
-            tail_opts.color = true;
+            args.tail_opts.color = true;
         } else if (arg == "--tail-json") {
-            tail_opts.json = true;
+            args.tail_opts.json = true;
         } else if (arg == "--validate-config") {
-            validate_config_mode = true;
-            // 可选路径参数：仅当下一个 token 不是 flag 时才消费
+            args.validate_config_mode = true;
             if (i + 1 < argc && argv[i + 1][0] != '-') {
-                validate_config_path = argv[++i];
+                args.validate_config_path = argv[++i];
             }
         } else if (arg == "--snapshot-diff") {
-            snapshot_diff_mode = true;
-            // 需要两个路径参数
+            args.snapshot_diff_mode = true;
             if (i + 1 < argc && argv[i + 1][0] != '-') {
-                snapshot_diff_opts.path_a = argv[++i];
+                args.snapshot_diff_opts.path_a = argv[++i];
             }
             if (i + 1 < argc && argv[i + 1][0] != '-') {
-                snapshot_diff_opts.path_b = argv[++i];
+                args.snapshot_diff_opts.path_b = argv[++i];
             }
         } else if (arg == "--snapshot-diff-json") {
-            snapshot_diff_opts.json = true;
+            args.snapshot_diff_opts.json = true;
         } else if (arg == "--snapshot-diff-verbose") {
-            snapshot_diff_opts.verbose = true;
+            args.snapshot_diff_opts.verbose = true;
         } else if (arg == "--info") {
-            info_mode = true;
-            // 可选 section：'json' / 'color' / 任意字符串
+            args.info_mode = true;
             if (i + 1 < argc && argv[i + 1][0] != '-') {
                 std::string section = argv[++i];
-                if (section == "json") info_opts.json = true;
-                else if (section == "color") info_opts.color = true;
-                // 其它值忽略，向后兼容
+                if (section == "json") args.info_opts.json = true;
+                else if (section == "color") args.info_opts.color = true;
             }
         } else if (arg == "--info-json") {
-            info_mode = true;
-            info_opts.json = true;
+            args.info_mode = true;
+            args.info_opts.json = true;
         } else if (arg == "--info-color") {
-            info_mode = true;
-            info_opts.color = true;
+            args.info_mode = true;
+            args.info_opts.color = true;
         }
     }
 
-    // --- Validate config mode: check config file and exit ----------------
-    if (validate_config_mode) {
-        // 路径优先级：显式参数 > -c/--config > 默认 config.ini
-        std::string path = validate_config_path;
-        if (path.empty()) path = config_path;
+    return args;
+}
+
+} // namespace
+
+int main(int argc, char** argv) {
+    // 对一次性命令跳过交互式更新检查
+    if (!is_one_shot_mode(argc, argv)) {
+        auto update_info = changeos::updater::check_for_update(VERSION);
+        changeos::updater::prompt_update(update_info);
+    }
+
+    // 解析命令行参数（提取为独立函数，降低 main() 复杂度）
+    ParsedArgs args = parse_args(argc, argv);
+
+    if (args.show_help) {
+        print_usage(argv[0]);
+        return 0;
+    }
+    if (args.show_version) {
+        std::cout << "change-of-system v" << VERSION << "\n";
+        return 0;
+    }
+    if (args.parse_error) {
+        return 1;
+    }
+
+    // --- 配置验证模式：检查配置文件并退出 ---
+    if (args.validate_config_mode) {
+        std::string path = args.validate_config_path;
+        if (path.empty()) path = args.config_path;
         if (path.empty()) path = "config.ini";
         auto result = changeos::validate::ConfigValidator::validate(path);
         int errors = changeos::validate::ConfigValidator::print_report(result, path);
         return errors > 0 ? 1 : 0;
     }
 
-    // --- Snapshot diff mode: compare two snapshots and exit --------------
-    if (snapshot_diff_mode) {
-        return changeos::snapshot_diff::SnapshotDiff::run(snapshot_diff_opts);
+    // --- 快照差异模式：比较两个快照并退出 ---
+    if (args.snapshot_diff_mode) {
+        return changeos::snapshot_diff::SnapshotDiff::run(args.snapshot_diff_opts);
     }
 
-    // --- System info mode: print quick summary and exit ------------------
-    if (info_mode) {
-        return changeos::info::SystemInfo::run(info_opts);
+    // --- 系统信息模式：打印快速摘要并退出 ---
+    if (args.info_mode) {
+        return changeos::info::SystemInfo::run(args.info_opts);
     }
 
-    // --- Snapshot mode: capture state and exit (no engine start) ----------
-    if (snapshot_mode) {
+    // --- 快照模式：捕获状态并退出（不启动引擎）---
+    if (args.snapshot_mode) {
         changeos::MonitorEngine engine;
-        if (!engine.initialize(config_path)) {
+        if (!engine.initialize(args.config_path)) {
             std::cerr << "Failed to initialize monitor engine\n";
             return 1;
         }
         changeos::snapshot::SnapshotConfig sc;
-        sc.output_path = (snapshot_path.empty() || snapshot_path == "-")
-                         ? std::string() : snapshot_path;
+        sc.output_path = (args.snapshot_path.empty() || args.snapshot_path == "-")
+                         ? std::string() : args.snapshot_path;
         auto& cfg = changeos::config::ConfigStore::instance();
         sc.max_processes = cfg.get_int("snapshot.max_processes", 50);
         sc.include_processes = cfg.get_bool("snapshot.include_processes", true);
@@ -280,45 +306,44 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    // --- Diagnostic mode: self-test and exit -----------------------------
-    if (diagnose_mode) {
+    // --- 诊断模式：自测并退出 ---
+    if (args.diagnose_mode) {
         changeos::MonitorEngine engine;
-        if (!engine.initialize(config_path)) {
+        if (!engine.initialize(args.config_path)) {
             std::cerr << "Failed to initialize monitor engine\n";
             return 1;
         }
-        auto result = engine.run_diagnostic(diagnose_path);
-        // Non-zero exit if any monitor is unavailable, to aid scripting.
+        auto result = engine.run_diagnostic(args.diagnose_path);
         return result.unavailable > 0 ? 2 : 0;
     }
 
-    // --- Query mode: search storage and exit -----------------------------
-    if (query_mode) {
+    // --- 查询模式：搜索存储并退出 ---
+    if (args.query_mode) {
         changeos::MonitorEngine engine;
-        if (!engine.initialize(config_path)) {
+        if (!engine.initialize(args.config_path)) {
             std::cerr << "Failed to initialize monitor engine\n";
             return 1;
         }
-        query_opts.keyword = query_keyword;
-        engine.query_events(query_opts);
+        args.query_opts.keyword = args.query_keyword;
+        engine.query_events(args.query_opts);
         return 0;
     }
 
-    // Check if already running
-    if (daemon_mode && changeos::utils::Daemon::is_already_running(pid_file)) {
-        std::cerr << "Another instance is already running (PID: " 
-                  << changeos::utils::Daemon::get_running_pid(pid_file) << ")\n";
+    // 检查是否已有实例运行
+    if (args.daemon_mode && changeos::utils::Daemon::is_already_running(args.pid_file)) {
+        std::cerr << "Another instance is already running (PID: "
+                  << changeos::utils::Daemon::get_running_pid(args.pid_file) << ")\n";
         return 1;
     }
 
-    // Daemonize if requested
-    if (daemon_mode) {
+    // 守护进程化
+    if (args.daemon_mode) {
         std::cout << "Starting in daemon mode...\n";
         if (!changeos::utils::Daemon::daemonize()) {
             std::cerr << "Failed to daemonize\n";
             return 1;
         }
-        if (!changeos::utils::Daemon::write_pid_file(pid_file)) {
+        if (!changeos::utils::Daemon::write_pid_file(args.pid_file)) {
             std::cerr << "Failed to write PID file\n";
             return 1;
         }
@@ -329,14 +354,13 @@ int main(int argc, char** argv) {
     std::signal(SIGHUP, on_sighup);
 
     changeos::MonitorEngine engine;
-    if (!engine.initialize(config_path)) {
+    if (!engine.initialize(args.config_path)) {
         std::cerr << "Failed to initialize monitor engine\n";
         return 1;
     }
 
-    // 在 tail 模式下不注册默认的 stdout 回调，避免事件被重复打印；
-    // TailWatcher 内部会注册自己的回调。
-    if (!tail_mode) {
+    // tail 模式下不注册默认 stdout 回调，避免重复打印
+    if (!args.tail_mode) {
         engine.on_event([](const changeos::Event& e) {
             std::cout << "[EVENT] " << changeos::category_name(e.category)
                       << " | " << changeos::type_name(e.type)
@@ -356,47 +380,48 @@ int main(int argc, char** argv) {
               << " | User: " << changeos::platform::username() << "\n";
     std::cout << "Press Ctrl+C to stop...\n";
 
-    // --- Tail mode: 进入实时事件流，阻塞直到收到退出信号 ---------------
-    if (tail_mode) {
-        // 静音默认的启动横幅已在上方打印，tail 自身有更聚焦的提示
-        return changeos::tail::TailWatcher::run(engine, tail_opts, g_running);
+    // --- Tail 模式：进入实时事件流 ---
+    if (args.tail_mode) {
+        return changeos::tail::TailWatcher::run(engine, args.tail_opts, g_running);
     }
 
-    // Handle export request
-    if (!export_path.empty()) {
-        std::string ext = export_path.substr(export_path.find_last_of('.') + 1);
+    // 处理导出请求
+    if (!args.export_path.empty()) {
+        // 添加 npos 检查，防止无扩展名时 substr 溢出
+        auto dot_pos = args.export_path.find_last_of('.');
+        std::string ext = (dot_pos != std::string::npos)
+            ? args.export_path.substr(dot_pos + 1) : "";
         changeos::export_::ExportFormat format = changeos::export_::ExportFormat::CSV;
         if (ext == "json") {
             format = changeos::export_::ExportFormat::JSON;
         }
-        
-        if (engine.export_events(export_path, format)) {
-            std::cout << "Events exported to " << export_path << "\n";
+
+        if (engine.export_events(args.export_path, format)) {
+            std::cout << "Events exported to " << args.export_path << "\n";
         } else {
             std::cerr << "Failed to export events\n";
         }
     }
 
-    // Handle report generation
-    if (!report_path.empty()) {
+    // 处理报告生成
+    if (!args.report_path.empty()) {
         changeos::report::ReportConfig config;
-        config.output_path = report_path;
-        
+        config.output_path = args.report_path;
+
         if (engine.generate_report(config)) {
-            std::cout << "Report generated: " << report_path << "\n";
+            std::cout << "Report generated: " << args.report_path << "\n";
         } else {
             std::cerr << "Failed to generate report\n";
         }
     }
 
-    // Handle config reload
-    if (reload_config) {
+    // 处理配置重载
+    if (args.reload_config) {
         engine.reload_config();
         std::cout << "Configuration reloaded\n";
     }
 
     while (g_running.load()) {
-        // Check for SIGHUP reload request
         if (g_reload_config.exchange(false)) {
             std::cout << "\nReloading configuration (SIGHUP received)...\n";
             engine.reload_config();
@@ -407,12 +432,12 @@ int main(int argc, char** argv) {
 
     std::cout << "\nShutting down...\n";
     engine.stop_all();
-    
-    // Clean up PID file
-    if (daemon_mode) {
-        changeos::utils::Daemon::remove_pid_file(pid_file);
+
+    // 清理 PID 文件
+    if (args.daemon_mode) {
+        changeos::utils::Daemon::remove_pid_file(args.pid_file);
     }
-    
+
     std::cout << "Stopped cleanly. Goodbye.\n";
     return 0;
 }

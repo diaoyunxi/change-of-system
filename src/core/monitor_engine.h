@@ -15,6 +15,7 @@
 #include "diagnostic/diagnostic_runner.h"
 
 #include <atomic>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -111,6 +112,10 @@ public:
 
 private:
     void route_event(const Event& event);
+    // initialize 的子方法，拆分过长的初始化逻辑（优化建议21）
+    void initialize_monitors_(config::ConfigStore& cfg);
+    void initialize_storage_(config::ConfigStore& cfg);
+    void initialize_subsystems_(config::ConfigStore& cfg, const std::string& config_path);
 
     std::unique_ptr<monitor::FilesystemMonitor> fs_;
     std::unique_ptr<monitor::ProcessMonitor> proc_;
@@ -140,7 +145,8 @@ private:
     std::vector<EventCallback> callbacks_;
 
     mutable std::mutex recent_mutex_;
-    std::vector<Event> recent_;
+    // 使用 std::deque 替代 std::vector，实现 O(1) 头部删除
+    std::deque<Event> recent_;
     std::atomic<bool> running_{false};
 };
 

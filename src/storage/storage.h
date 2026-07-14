@@ -48,7 +48,15 @@ public:
     }
 };
 
-std::unique_ptr<Storage> create_sqlite_storage();
+/// 创建默认存储后端（基于文件的 TSV 存储）
+std::unique_ptr<Storage> create_default_storage();
+
+/// 向后兼容别名（已弃用，请使用 create_default_storage）
+/// 保留此函数是因为旧代码可能仍在调用 create_sqlite_storage()
+[[deprecated("Use create_default_storage() instead")]]
+inline std::unique_ptr<Storage> create_sqlite_storage() {
+    return create_default_storage();
+}
 
 } // namespace storage
 } // namespace changeos

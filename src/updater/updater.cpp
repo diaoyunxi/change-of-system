@@ -7,6 +7,11 @@
 #include <sstream>
 #include <vector>
 
+#ifdef COS_HAS_NLOHMANN_JSON
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
+#endif
+
 #ifdef COS_USE_REMOTE_REPORTING
 #include <curl/curl.h>
 #endif
@@ -63,26 +68,45 @@ std::string http_get(const std::string& url) {
     return response;
 }
 
-std::string extract_json_string(const std::string& json, const std::string& key) {
+std::string extract_json_string(const std::string& json_str, const std::string& key) {
+#ifdef COS_HAS_NLOHMANN_JSON
+    // 使用 nlohmann/json 库替代手写解析，更健壮且支持标准 JSON 格式
+    try {
+        auto j = json::parse(json_str);
+        // 支持数组响应（如 GitHub Tags API 返回数组）
+        if (j.is_array() && !j.empty() && j[0].contains(key)) {
+            if (j[0][key].is_string()) return j[0][key].get<std::string>();
+        }
+        // 支持对象响应
+        if (j.contains(key) && j[key].is_string()) {
+            return j[key].get<std::string>();
+        }
+        return "";
+    } catch (const json::exception&) {
+        return "";
+    }
+#else
+    // 回退到手写 JSON 解析（当系统未安装 nlohmann/json 时）
     std::string search = "\"" + key + "\"";
-    size_t pos = json.find(search);
+    size_t pos = json_str.find(search);
     if (pos == std::string::npos) return "";
 
     pos += search.size();
     // Skip whitespace and colon
-    while (pos < json.size() && (json[pos] == ' ' || json[pos] == ':' || json[pos] == '\t')) pos++;
-    if (pos >= json.size() || json[pos] != '"') return "";
+    while (pos < json_str.size() && (json_str[pos] == ' ' || json_str[pos] == ':' || json_str[pos] == '\t')) pos++;
+    if (pos >= json_str.size() || json_str[pos] != '"') return "";
     pos++; // skip opening quote
 
     std::string result;
-    while (pos < json.size() && json[pos] != '"') {
-        if (json[pos] == '\\' && pos + 1 < json.size()) {
+    while (pos < json_str.size() && json_str[pos] != '"') {
+        if (json_str[pos] == '\\' && pos + 1 < json_str.size()) {
             pos++;
         }
-        result += json[pos];
+        result += json_str[pos];
         pos++;
     }
     return result;
+#endif
 }
 
 int compare_versions(const std::string& v1, const std::string& v2) {
@@ -184,6 +208,9 @@ void prompt_update(const UpdateInfo& info) {
 
     if (choice == "y" || choice == "Y") {
         std::cout << "正在更新...\n";
+        // 设置 git 安全环境变量，防止读取系统级配置和终端交互提示
+        setenv("GIT_CONFIG_NOSYSTEM", "1", 1);
+        setenv("GIT_TERMINAL_PROMPT", "0", 1);
         int result = std::system("git pull 2>&1");
         if (result == 0) {
             std::cout << "更新成功！请重新编译并运行程序。\n";

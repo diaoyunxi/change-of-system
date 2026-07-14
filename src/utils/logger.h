@@ -45,8 +45,14 @@ public:
         auto now = std::chrono::system_clock::now();
         auto time_t_val = std::chrono::system_clock::to_time_t(now);
         char buf[64];
-        std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S",
-                      std::localtime(&time_t_val));
+        // 使用线程安全的 localtime_r（POSIX）或 localtime_s（Windows）替代 std::localtime
+        struct tm tm_buf;
+#if defined(_WIN32) || defined(_MSC_VER)
+        localtime_s(&tm_buf, &time_t_val);
+#else
+        localtime_r(&time_t_val, &tm_buf);
+#endif
+        std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &tm_buf);
         std::string full = std::string("[") + buf + "] [" + level_str + "] " + message + "\n";
         if (console_enabled_) {
             std::fprintf(stderr, "%s", full.c_str());

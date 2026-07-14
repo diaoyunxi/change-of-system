@@ -33,6 +33,19 @@ bool MonitorEngine::initialize(const std::string& config_path) {
     auto& cfg = config::ConfigStore::instance();
     if (!config_path.empty()) cfg.load(config_path);
 
+    // === 阶段1: 创建和配置各监控器 ===
+    initialize_monitors_(cfg);
+
+    // === 阶段2: 初始化存储后端 ===
+    initialize_storage_(cfg);
+
+    // === 阶段3: 初始化报告/告警/安全/Webhook 等子系统 ===
+    initialize_subsystems_(cfg, config_path);
+
+    return true;
+}
+
+void MonitorEngine::initialize_monitors_(config::ConfigStore& cfg) {
     fs_ = std::make_unique<monitor::FilesystemMonitor>();
     proc_ = std::make_unique<monitor::ProcessMonitor>();
     net_ = std::make_unique<monitor::NetworkMonitor>();
@@ -119,8 +132,10 @@ bool MonitorEngine::initialize(const std::string& config_path) {
     log_->add_pattern("critical", "critical|CRITICAL|CRIT|fatal|FATAL", "critical");
     log_->add_pattern("authentication_failure", "authentication failure|auth failure|login failed|failed login", "critical");
     log_->add_pattern("permission_denied", "permission denied|access denied|denied", "warning");
+}
 
-    storage_ = storage::create_sqlite_storage();
+void MonitorEngine::initialize_storage_(config::ConfigStore& cfg) {
+    storage_ = storage::create_default_storage();
     std::string storage_path = cfg.get("storage.database_path",
                                         "change-of-system.log");
     if (!storage_->open(storage_path)) {
@@ -138,7 +153,9 @@ bool MonitorEngine::initialize(const std::string& config_path) {
         COS_LOG_INFO("Storage rotation enabled: max_size=" + std::to_string(rotate_max_mb) +
                      "MB, backups=" + std::to_string(rotate_count));
     }
+}
 
+void MonitorEngine::initialize_subsystems_(config::ConfigStore& cfg, const std::string& config_path) {
     reporter_ = std::make_unique<reporting::Reporter>();
     reporter_->configure(
         cfg.get("reporting.endpoint"),
@@ -237,8 +254,6 @@ bool MonitorEngine::initialize(const std::string& config_path) {
     port_->on_event(route);
     pkg_->on_event(route);
     env_->on_event(route);
-
-    return true;
 }
 
 bool MonitorEngine::start_all() {
@@ -320,8 +335,8 @@ void MonitorEngine::route_event(const Event& event) {
     {
         std::lock_guard<std::mutex> lock(recent_mutex_);
         recent_.push_back(filtered_event);
-        if (recent_.size() > kMaxRecentEvents) recent_.erase(recent_.begin(),
-                                                                recent_.end() - kMaxRecentEvents);
+        // 使用 deque 的 pop_front 实现 O(1) 头部删除，替代 vector 的 O(n) erase
+        while (recent_.size() > kMaxRecentEvents) recent_.pop_front();
     }
 
     std::vector<EventCallback> snapshot;

@@ -51,8 +51,15 @@ set_target_properties(cos_core PROPERTIES
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(cos_core PUBLIC pthread)
-    find_package(OpenSSL REQUIRED)
-    target_link_libraries(cos_core PUBLIC OpenSSL::SSL OpenSSL::Crypto)
+endif()
+
+# OpenSSL: 用于 HMAC-SHA256 签名计算等安全功能（所有平台均需要）
+find_package(OpenSSL REQUIRED)
+target_link_libraries(cos_core PUBLIC OpenSSL::SSL OpenSSL::Crypto)
+
+# nlohmann/json: 用于 updater.cpp 中的 JSON 解析（可选，系统已安装时链接）
+if(nlohmann_json_FOUND)
+    target_link_libraries(cos_core PUBLIC nlohmann_json::nlohmann_json)
 endif()
 
 # CURL detection: enables the update checker and remote HTTP reporting

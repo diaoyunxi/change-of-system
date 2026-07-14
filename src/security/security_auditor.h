@@ -107,7 +107,6 @@ public:
     std::vector<SecurityEvent> get_recent_events(std::size_t limit = 100) const;
 
 private:
-    void analyze_authentication_event(const Event& event);
     void analyze_file_event(const Event& event);
     void analyze_process_event(const Event& event);
     void analyze_network_event(const Event& event);

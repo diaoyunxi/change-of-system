@@ -23,15 +23,32 @@ AlertManager::~AlertManager() = default;
 
 void AlertManager::add_rule(const AlertRule& rule) {
     std::lock_guard<std::mutex> lock(mutex_);
-    // Remove existing rule with same name
+    AlertRule r = rule;
+    // 预编译正则表达式，避免每次 matches_rule 调用时重复编译
+    try {
+        if (!r.source_pattern.empty())
+            r.compiled_source = std::make_shared<std::regex>(
+                r.source_pattern, std::regex::ECMAScript | std::regex::icase);
+    } catch (const std::regex_error&) {}
+    try {
+        if (!r.target_pattern.empty())
+            r.compiled_target = std::make_shared<std::regex>(
+                r.target_pattern, std::regex::ECMAScript | std::regex::icase);
+    } catch (const std::regex_error&) {}
+    try {
+        if (!r.summary_pattern.empty())
+            r.compiled_summary = std::make_shared<std::regex>(
+                r.summary_pattern, std::regex::ECMAScript | std::regex::icase);
+    } catch (const std::regex_error&) {}
+    // 移除同名的已有规则
     auto it = std::find_if(rules_.begin(), rules_.end(),
-        [&](const AlertRule& r) { return r.name == rule.name; });
+        [&](const AlertRule& existing) { return existing.name == r.name; });
     if (it != rules_.end()) {
-        *it = rule;
+        *it = r;
     } else {
-        rules_.push_back(rule);
+        rules_.push_back(r);
     }
-    COS_LOG_INFO("Alert rule added: " + rule.name);
+    COS_LOG_INFO("Alert rule added: " + r.name);
 }
 
 void AlertManager::remove_rule(const std::string& name) {
@@ -107,7 +124,7 @@ void AlertManager::process_event(const Event& event) {
 }
 
 bool AlertManager::matches_rule(const AlertRule& rule, const Event& event) {
-    // Check category
+    // 检查事件类别
     if (!rule.categories.empty()) {
         if (std::find(rule.categories.begin(), rule.categories.end(),
                       event.category) == rule.categories.end()) {
@@ -115,7 +132,7 @@ bool AlertManager::matches_rule(const AlertRule& rule, const Event& event) {
         }
     }
 
-    // Check type
+    // 检查事件类型
     if (!rule.types.empty()) {
         if (std::find(rule.types.begin(), rule.types.end(),
                       event.type) == rule.types.end()) {
@@ -123,43 +140,28 @@ bool AlertManager::matches_rule(const AlertRule& rule, const Event& event) {
         }
     }
 
-    // Check source pattern
-    if (!rule.source_pattern.empty()) {
-        try {
-            std::regex re(rule.source_pattern, std::regex::ECMAScript | std::regex::icase);
-            if (!std::regex_search(event.source, re)) {
-                return false;
-            }
-        } catch (const std::regex_error&) {
-            // Invalid regex, skip
+    // 检查 source 正则（使用预编译的缓存正则）
+    if (rule.compiled_source) {
+        if (!std::regex_search(event.source, *rule.compiled_source)) {
+            return false;
         }
     }
 
-    // Check target pattern
-    if (!rule.target_pattern.empty()) {
-        try {
-            std::regex re(rule.target_pattern, std::regex::ECMAScript | std::regex::icase);
-            if (!std::regex_search(event.target, re)) {
-                return false;
-            }
-        } catch (const std::regex_error&) {
-            // Invalid regex, skip
+    // 检查 target 正则（使用预编译的缓存正则）
+    if (rule.compiled_target) {
+        if (!std::regex_search(event.target, *rule.compiled_target)) {
+            return false;
         }
     }
 
-    // Check summary pattern
-    if (!rule.summary_pattern.empty()) {
-        try {
-            std::regex re(rule.summary_pattern, std::regex::ECMAScript | std::regex::icase);
-            if (!std::regex_search(event.summary, re)) {
-                return false;
-            }
-        } catch (const std::regex_error&) {
-            // Invalid regex, skip
+    // 检查 summary 正则（使用预编译的缓存正则）
+    if (rule.compiled_summary) {
+        if (!std::regex_search(event.summary, *rule.compiled_summary)) {
+            return false;
         }
     }
 
-    // Check custom condition
+    // 检查自定义条件
     if (rule.custom_condition) {
         if (!rule.custom_condition(event)) {
             return false;
@@ -171,16 +173,17 @@ bool AlertManager::matches_rule(const AlertRule& rule, const Event& event) {
 
 void AlertManager::trigger_alert(const AlertRule& rule, const Event& event) {
     Alert alert;
-    alert.id = next_alert_id_++;
     alert.timestamp = now();
     alert.rule_name = rule.name;
     alert.severity = rule.severity;
     alert.trigger_event = event;
-    alert.message = format_message(rule.message_template, event);
+    alert.message = format_message(rule.message_template, event, rule);
 
     std::vector<AlertCallback> callbacks_copy;
     {
         std::lock_guard<std::mutex> lock(mutex_);
+        // 将 next_alert_id_ 自增移到锁内，保证 ID 分配与告警存储的原子性
+        alert.id = next_alert_id_++;
         alerts_.push_back(alert);
         last_triggered_[rule.name] = alert.timestamp;
         // 限制告警历史数量，防止长期运行内存无限增长
@@ -199,7 +202,7 @@ void AlertManager::trigger_alert(const AlertRule& rule, const Event& event) {
     }
 }
 
-std::string AlertManager::format_message(const std::string& tmpl, const Event& event) {
+std::string AlertManager::format_message(const std::string& tmpl, const Event& event, const AlertRule& rule) {
     if (tmpl.empty()) {
         return "Alert triggered for event: " + event.summary;
     }
@@ -207,7 +210,7 @@ std::string AlertManager::format_message(const std::string& tmpl, const Event& e
     std::string result = tmpl;
     size_t pos;
 
-    // Replace placeholders
+    // 替换占位符
     while ((pos = result.find("{{source}}")) != std::string::npos) {
         result.replace(pos, 10, event.source);
     }
@@ -222,6 +225,13 @@ std::string AlertManager::format_message(const std::string& tmpl, const Event& e
     }
     while ((pos = result.find("{{type}}")) != std::string::npos) {
         result.replace(pos, 8, type_name(event.type));
+    }
+    // 替换阈值相关占位符（实现之前未替换的占位符）
+    while ((pos = result.find("{{threshold_count}}")) != std::string::npos) {
+        result.replace(pos, 20, std::to_string(rule.threshold_count));
+    }
+    while ((pos = result.find("{{threshold_window_ms}}")) != std::string::npos) {
+        result.replace(pos, 24, std::to_string(rule.threshold_window_ms));
     }
 
     return result;

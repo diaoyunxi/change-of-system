@@ -32,7 +32,14 @@ namespace {
 std::string format_iso8601(Timestamp ts) {
     auto t = std::chrono::system_clock::to_time_t(ts);
     char buf[32];
-    std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", std::gmtime(&t));
+    // 使用线程安全的 gmtime_r（POSIX）或 gmtime_s（Windows）替代 std::gmtime
+    struct tm gm_buf;
+#if defined(_WIN32) || defined(_MSC_VER)
+    gmtime_s(&gm_buf, &t);
+#else
+    gmtime_r(&t, &gm_buf);
+#endif
+    std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &gm_buf);
     return std::string(buf);
 }
 
@@ -412,18 +419,27 @@ std::string SnapshotGenerator::capture_ports() {
 std::string SnapshotGenerator::capture_environment() {
     std::ostringstream oss;
     oss << "      \"environment\": {\n";
-    // Capture a curated set of commonly-interesting environment variables.
+    // 捕获一组常用的环境变量
     static const char* vars[] = {
         "PATH", "HOME", "USER", "LOGNAME", "SHELL", "TERM", "LANG", "LC_ALL",
         "HOSTNAME", "PWD", "LD_LIBRARY_PATH", "LD_PRELOAD"
+    };
+    // 敏感环境变量名（其值需要脱敏，防止泄露库注入路径等敏感信息）
+    static const std::set<std::string> sensitive_vars = {
+        "LD_PRELOAD", "LD_LIBRARY_PATH"
     };
     bool first = true;
     for (const char* v : vars) {
         const char* val = std::getenv(v);
         if (!val) continue;
+        std::string value(val);
+        // 对敏感环境变量值做脱敏：仅保留前8个字符 + *** 标记
+        if (sensitive_vars.count(v) && value.length() > 8) {
+            value = value.substr(0, 8) + "***";
+        }
         if (!first) oss << ",\n";
         first = false;
-        oss << "        \"" << v << "\": \"" << json_escape(val) << "\"";
+        oss << "        \"" << v << "\": \"" << json_escape(value) << "\"";
     }
     oss << "\n      }";
     return oss.str();
