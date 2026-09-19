@@ -7,6 +7,11 @@
 #include <sstream>
 #include <vector>
 
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <signal.h>
+
 #ifdef COS_HAS_NLOHMANN_JSON
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
@@ -211,11 +216,33 @@ void prompt_update(const UpdateInfo& info) {
         // 设置 git 安全环境变量，防止读取系统级配置和终端交互提示
         setenv("GIT_CONFIG_NOSYSTEM", "1", 1);
         setenv("GIT_TERMINAL_PROMPT", "0", 1);
-        int result = std::system("git pull 2>&1");
-        if (result == 0) {
-            std::cout << "更新成功！请重新编译并运行程序。\n";
+        // 使用 fork+exec 替代 system()，避免 shell 注入风险并添加超时保护
+        pid_t pid = fork();
+        if (pid == 0) {
+            // 子进程：执行 git pull
+            execlp("git", "git", "pull", nullptr);
+            _exit(127); // execlp 失败时退出
+        } else if (pid > 0) {
+            // 父进程：等待子进程完成，超时 60 秒
+            int status = 0;
+            int wait_result = 0;
+            for (int i = 0; i < 60; ++i) {
+                wait_result = waitpid(pid, &status, WNOHANG);
+                if (wait_result != 0) break;
+                sleep(1);
+            }
+            if (wait_result == 0) {
+                // 超时：终止子进程
+                kill(pid, SIGTERM);
+                waitpid(pid, &status, 0);
+                std::cout << "更新超时（60秒），请手动访问:\n  " << info.release_url << "\n";
+            } else if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+                std::cout << "更新成功！请重新编译并运行程序。\n";
+            } else {
+                std::cout << "自动更新失败，请手动访问:\n  " << info.release_url << "\n";
+            }
         } else {
-            std::cout << "自动更新失败，请手动访问:\n  " << info.release_url << "\n";
+            std::cout << "创建子进程失败，请手动访问:\n  " << info.release_url << "\n";
         }
     }
 }
