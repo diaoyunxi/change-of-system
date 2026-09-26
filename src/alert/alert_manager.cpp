@@ -29,17 +29,23 @@ void AlertManager::add_rule(const AlertRule& rule) {
         if (!r.source_pattern.empty())
             r.compiled_source = std::make_shared<std::regex>(
                 r.source_pattern, std::regex::ECMAScript | std::regex::icase);
-    } catch (const std::regex_error&) {}
+    } catch (const std::regex_error& e) {
+        COS_LOG_WARNING("Alert rule '" + r.name + "' source_pattern regex compile failed: " + e.what());
+    }
     try {
         if (!r.target_pattern.empty())
             r.compiled_target = std::make_shared<std::regex>(
                 r.target_pattern, std::regex::ECMAScript | std::regex::icase);
-    } catch (const std::regex_error&) {}
+    } catch (const std::regex_error& e) {
+        COS_LOG_WARNING("Alert rule '" + r.name + "' target_pattern regex compile failed: " + e.what());
+    }
     try {
         if (!r.summary_pattern.empty())
             r.compiled_summary = std::make_shared<std::regex>(
                 r.summary_pattern, std::regex::ECMAScript | std::regex::icase);
-    } catch (const std::regex_error&) {}
+    } catch (const std::regex_error& e) {
+        COS_LOG_WARNING("Alert rule '" + r.name + "' summary_pattern regex compile failed: " + e.what());
+    }
     // 移除同名的已有规则
     auto it = std::find_if(rules_.begin(), rules_.end(),
         [&](const AlertRule& existing) { return existing.name == r.name; });
