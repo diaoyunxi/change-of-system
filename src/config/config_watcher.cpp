@@ -27,21 +27,28 @@ void ConfigWatcher::watch_loop() {
         
         if (!watching_.load()) break;
         
-        std::lock_guard<std::mutex> lock(mutex_);
-        
-        auto current_modified = get_file_modified_time(config_path_);
-        
-        if (current_modified != last_modified_ && current_modified != std::chrono::system_clock::time_point{}) {
-            COS_LOG_INFO("Configuration file changed, reloading: " + config_path_);
-            last_modified_ = current_modified;
+        // 仅在锁保护范围内访问共享成员，回调在锁外执行避免死锁
+        bool config_changed = false;
+        ReloadCallback cb;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
             
-            if (callback_) {
-                try {
-                    callback_();
-                    COS_LOG_INFO("Configuration reloaded successfully");
-                } catch (const std::exception& e) {
-                    COS_LOG_ERROR("Failed to reload configuration: " + std::string(e.what()));
-                }
+            auto current_modified = get_file_modified_time(config_path_);
+            
+            if (current_modified != last_modified_ && current_modified != std::chrono::system_clock::time_point{}) {
+                COS_LOG_INFO("Configuration file changed, reloading: " + config_path_);
+                last_modified_ = current_modified;
+                config_changed = true;
+                cb = callback_;  // 拷贝回调，在锁外调用
+            }
+        }
+        
+        if (config_changed && cb) {
+            try {
+                cb();
+                COS_LOG_INFO("Configuration reloaded successfully");
+            } catch (const std::exception& e) {
+                COS_LOG_ERROR("Failed to reload configuration: " + std::string(e.what()));
             }
         }
     }
