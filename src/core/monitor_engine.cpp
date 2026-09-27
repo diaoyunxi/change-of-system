@@ -424,7 +424,11 @@ void MonitorEngine::reload_config() {
     integrity_->set_poll_interval_ms(cfg.get_int("file_integrity.poll_interval_ms", 30000));
     usb_->set_poll_interval_ms(cfg.get_int("usb_device.poll_interval_ms", 5000));
     disk_->set_poll_interval_ms(cfg.get_int("disk_space.poll_interval_ms", 30000));
+    load_->set_poll_interval_ms(cfg.get_int("system_load.poll_interval_ms", 5000));
     log_->set_poll_interval_ms(cfg.get_int("log.poll_interval_ms", 5000));
+    port_->set_poll_interval_ms(cfg.get_int("port.poll_interval_ms", 5000));
+    pkg_->set_poll_interval_ms(cfg.get_int("package.poll_interval_ms", 60000));
+    env_->set_poll_interval_ms(cfg.get_int("environment.poll_interval_ms", 10000));
     
     COS_LOG_INFO("Configuration reloaded successfully");
 }
