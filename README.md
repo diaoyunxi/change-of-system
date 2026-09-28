@@ -292,7 +292,7 @@ CMake options:
 > and `check_for_update()` returns a no-op `UpdateInfo` instead of making any
 > network request.
 
-Output binaries (in `build/`, generated after compilation):
+Output binaries (generated after compilation, not stored in repo):
 
 - `change-of-system` — headless CLI daemon.
 - `change-of-system-gui` — Qt-based dashboard (if Qt5 was found).
