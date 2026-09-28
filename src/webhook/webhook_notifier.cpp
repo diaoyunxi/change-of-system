@@ -198,16 +198,6 @@ bool WebhookNotifier::send_webhook(const std::string& name, const WebhookPayload
     headers["Content-Type"] = "application/json";
     headers["User-Agent"] = "change-of-system/1.0";
 
-    // 日志中脱敏 Authorization 头，避免凭证泄露
-    std::string log_headers_summary;
-    for (const auto& kv : headers) {
-        if (kv.first == "Authorization") {
-            log_headers_summary += kv.first + ": [REDACTED], ";
-        } else {
-            log_headers_summary += kv.first + ": " + kv.second + ", ";
-        }
-    }
-
     int http_status = 0;
     std::string error;
     bool success = false;
