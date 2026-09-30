@@ -7,6 +7,8 @@
 #include <cstring>
 #include <fstream>
 #include <sstream>
+#include <memory>
+#include <stdexcept>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -212,14 +214,14 @@ std::map<std::string, UsbDeviceInfo> UsbDeviceMonitor::scan_usb_devices() {
 #elif defined(__APPLE__)
     // macOS: Use system_profiler output (simplified)
     // In a real implementation, use IOKit
-    FILE* pipe = popen("system_profiler SPUSBDataType 2>/dev/null", "r");
+    std::unique_ptr<FILE, decltype(&pclose)> pipe(
+        popen("system_profiler SPUSBDataType 2>/dev/null", "r"), pclose);
     if (pipe) {
         char buffer[1024];
         std::string result;
-        while (fgets(buffer, sizeof(buffer), pipe)) {
+        while (fgets(buffer, sizeof(buffer), pipe.get())) {
             result += buffer;
         }
-        pclose(pipe);
         // Parse the output - simplified version
         // Real implementation would use IOKit framework
     }
