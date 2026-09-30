@@ -5,6 +5,8 @@
 
 #include <fstream>
 #include <sstream>
+#include <memory>
+#include <stdexcept>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -214,13 +216,19 @@ SystemLoadInfo SystemLoadMonitor::get_system_load() {
     }
 
     // For CPU usage, use host_processor_info (simplified)
-    FILE* pipe = popen("top -l 1 | grep 'CPU usage' | awk '{print $3}'", "r");
+    std::unique_ptr<FILE, decltype(&pclose)> pipe(
+        popen("top -l 1 | grep 'CPU usage' | awk '{print $3}'", "r"), pclose);
     if (pipe) {
         char buffer[64];
-        if (fgets(buffer, sizeof(buffer), pipe)) {
-            info.cpu_usage_percent = std::stod(buffer);
+        if (fgets(buffer, sizeof(buffer), pipe.get())) {
+            try {
+                info.cpu_usage_percent = std::stod(buffer);
+            } catch (const std::exception& e) {
+                // top 输出格式变化或非数字时忽略，保持 cpu_usage_percent = 0
+                COS_LOG_WARN(std::string("system_load_monitor: failed to parse CPU usage '")
+                             + buffer + "': " + e.what());
+            }
         }
-        pclose(pipe);
     }
 #endif
 
