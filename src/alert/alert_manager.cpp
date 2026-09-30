@@ -204,7 +204,7 @@ void AlertManager::trigger_alert(const AlertRule& rule, const Event& event) {
                  rule.name + ": " + alert.message);
 
     for (auto& cb : callbacks_copy) {
-        try { cb(alert); } catch (...) {}
+        try { cb(alert); } catch (const std::exception& e) { std::cerr << "[AlertManager] callback exception: " << e.what() << std::endl; } catch (...) { std::cerr << "[AlertManager] unknown callback exception" << std::endl; }
     }
 }
 

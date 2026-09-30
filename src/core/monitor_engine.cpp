@@ -110,7 +110,7 @@ void MonitorEngine::initialize_monitors_(config::ConfigStore& cfg) {
     if (!watch_ports.empty()) {
         std::set<int> ports;
         for (const auto& p : watch_ports) {
-            try { ports.insert(std::stoi(p)); } catch (...) {}
+            try { ports.insert(std::stoi(p)); } catch (const std::exception& e) { std::cerr << "[MonitorEngine] port parse error: " << e.what() << std::endl; }
         }
         port_->set_watch_ports(ports);
     }
