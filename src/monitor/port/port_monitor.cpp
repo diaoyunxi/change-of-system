@@ -5,6 +5,7 @@
 #include <sstream>
 #include <algorithm>
 #include <chrono>
+#include <memory>
 
 namespace changeos {
 namespace monitor {
@@ -90,10 +91,11 @@ std::map<int, PortMonitor::PortInfo> PortMonitor::snapshot_ports() {
 #elif defined(__APPLE__) || defined(__FreeBSD__)
     // Use netstat on macOS/BSD
     // This is a simplified implementation
-    FILE* fp = popen("netstat -an -p tcp 2>/dev/null", "r");
+    std::unique_ptr<FILE, decltype(&pclose)> fp(
+        popen("netstat -an -p tcp 2>/dev/null", "r"), pclose);
     if (fp) {
         char buffer[1024];
-        while (fgets(buffer, sizeof(buffer), fp)) {
+        while (fgets(buffer, sizeof(buffer), fp.get())) {
             std::string line(buffer);
             // Parse netstat output for listening ports
             // Format: tcp4/6 0 0 *.port *.* LISTEN
@@ -109,7 +111,6 @@ std::map<int, PortMonitor::PortInfo> PortMonitor::snapshot_ports() {
                 }
             }
         }
-        pclose(fp);
     }
 #endif
 
