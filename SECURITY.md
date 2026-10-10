@@ -1,18 +1,34 @@
-# 安全策略
+# Security Policy
 
-## 报告安全漏洞
+## Supported Versions
 
-如果你发现了安全漏洞，请通过以下方式报告：
+| Version | Supported          |
+| ------- | ------------------ |
+| Latest  | :white_check_mark: |
 
-1. **请勿**在公开的 GitHub Issue 中报告安全漏洞
-2. 请通过 GitHub 的 [Security Advisories](https://github.com/diaoyunxi/change-of-system/security/advisories/new) 页面提交报告
+## Reporting a Vulnerability
 
-## 安全范围
+### How to Report
 
-以下属于本项目的安全关注点：
+1. **Do NOT open a public issue** for security vulnerabilities
+2. Use GitHub's [private vulnerability reporting](https://github.com/diaoyunxi/) feature
+3. Include detailed description and reproduction steps
 
-- 自动更新模块的 shell 注入（CWE-78）
-- 文件完整性监控的绕过
-- 配置文件注入
-- 监控器权限提升
-- Webhook URL SSRF（CWE-918）
+### Response Timeline
+
+- **48 hours**: Acknowledgment
+- **7 days**: Assessment
+- **30 days**: Fix for critical issues
+
+### Scope
+
+- Kernel driver vulnerabilities
+- Privilege escalation vectors
+- Memory safety issues (buffer overflows, use-after-free)
+- DLL injection/hijacking risks
+
+### Best Practices
+
+- Only install signed drivers
+- Verify DLL integrity before loading
+- Run with minimum required privileges
