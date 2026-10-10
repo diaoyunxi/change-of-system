@@ -1,0 +1,9 @@
+---
+Checks: 'clang-diagnostic-*,clang-analyzer-*,modernize-*,performance-*,bugprone-*'
+WarningsAsErrors: ''
+HeaderFilterRegex: '.*'
+CheckOptions:
+  - key: modernize-use-nullptr.NullMacros
+    value: 'NULL'
+  - key: bugprone-argument-comment.CommentBoolLiterals
+    value: '1'
