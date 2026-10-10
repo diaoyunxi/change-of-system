@@ -81,16 +81,16 @@ std::string FileIntegrityMonitor::compute_hash(const std::string& path) {
     CC_SHA256_Final(digest, &ctx);
 
 #elif defined(_WIN32)
-    BCRYPT_ALG_HANDLE hAlg = NULL;
-    BCRYPT_HASH_HANDLE hHash = NULL;
+    BCRYPT_ALG_HANDLE hAlg = nullptr;
+    BCRYPT_HASH_HANDLE hHash = nullptr;
     NTSTATUS status;
     DWORD cbHash, cbData;
     unsigned char digest[32];
 
-    status = BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_SHA256_ALGORITHM, NULL, 0);
+    status = BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_SHA256_ALGORITHM, nullptr, 0);
     if (!BCRYPT_SUCCESS(status)) return "";
 
-    status = BCryptCreateHash(hAlg, &hHash, NULL, 0, NULL, 0, 0);
+    status = BCryptCreateHash(hAlg, &hHash, nullptr, 0, nullptr, 0, 0);
     if (!BCRYPT_SUCCESS(status)) {
         BCryptCloseAlgorithmProvider(hAlg, 0);
         return "";
