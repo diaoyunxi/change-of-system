@@ -1,6 +1,7 @@
 #include "monitor/port/port_monitor.h"
 #include "utils/periodic_runner.h"
 
+#include <cctype>
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -98,14 +99,22 @@ std::map<int, PortMonitor::PortInfo> PortMonitor::snapshot_ports() {
             // Parse netstat output for listening ports
             // Format: tcp4/6 0 0 *.port *.* LISTEN
             for (int port : watch_ports_) {
-                if (line.find("." + std::to_string(port)) != std::string::npos) {
-                    PortInfo info;
-                    info.port = port;
-                    info.protocol = "TCP";
-                    info.state = line.find("LISTEN") != std::string::npos ? "LISTEN" : "OTHER";
-                    info.address = "*";
-                    info.process = "unknown";
-                    result[port] = info;
+                std::string needle = "." + std::to_string(port);
+                auto pos = line.find(needle);
+                // Boundary check: ensure the match is not a substring of a longer port
+                // number (e.g., ".80" must not match ".8080"). After the needle the next
+                // character must be whitespace, end-of-string, or a non-digit.
+                if (pos != std::string::npos) {
+                    size_t after = pos + needle.size();
+                    if (after >= line.size() || !std::isdigit(static_cast<unsigned char>(line[after]))) {
+                        PortInfo info;
+                        info.port = port;
+                        info.protocol = "TCP";
+                        info.state = line.find("LISTEN") != std::string::npos ? "LISTEN" : "OTHER";
+                        info.address = "*";
+                        info.process = "unknown";
+                        result[port] = info;
+                    }
                 }
             }
         }
