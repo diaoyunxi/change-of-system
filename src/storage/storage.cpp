@@ -96,7 +96,11 @@ Event parse_event(const std::string& line) {
 
 class FileStorage : public Storage {
 public:
-    ~FileStorage() override { close(); }
+    ~FileStorage() override {
+        // 直接内联关闭逻辑，避免析构函数中调用虚函数（cppcheck virtualCallInConstructor）
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (file_.is_open()) file_.close();
+    }
 
     bool open(const std::string& connection_string) override {
         std::lock_guard<std::mutex> lock(mutex_);
