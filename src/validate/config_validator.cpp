@@ -152,7 +152,7 @@ bool is_valid_int(const std::string& v) {
 bool is_valid_double(const std::string& v) {
     if (v.empty()) return false;
     try {
-        std::stod(v);
+        (void)std::stod(v); // 仅验证格式合法性，不需要解析结果
         return true;
     } catch (...) {
         return false;
