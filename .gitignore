@@ -30,3 +30,8 @@ Thumbs.db
 
 # Config generated
 config.ini.local
+
+# Environment files (may contain secrets)
+.env
+.env.local
+.env.*.local
