@@ -1,5 +1,8 @@
 #pragma once
 
+#include <chrono>
+#include <cstdio>
+#include <ctime>
 #include <fstream>
 #include <mutex>
 #include <string>
@@ -46,7 +49,7 @@ public:
         auto time_t_val = std::chrono::system_clock::to_time_t(now);
         char buf[64];
         // 使用线程安全的 localtime_r（POSIX）或 localtime_s（Windows）替代 std::localtime
-        struct tm tm_buf;
+        struct tm tm_buf{};
 #if defined(_WIN32) || defined(_MSC_VER)
         localtime_s(&tm_buf, &time_t_val);
 #else
@@ -72,10 +75,6 @@ private:
 
 } // namespace utils
 } // namespace changeos
-
-#include <chrono>
-#include <cstdio>
-#include <ctime>
 
 #define COS_LOG_DEBUG(msg) ::changeos::utils::Logger::instance().log(::changeos::utils::LogLevel::Debug, msg)
 #define COS_LOG_INFO(msg)  ::changeos::utils::Logger::instance().log(::changeos::utils::LogLevel::Info, msg)
