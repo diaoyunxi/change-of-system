@@ -350,9 +350,9 @@ std::string SnapshotGenerator::capture_network() {
         for (const auto& tok : rows) {
             if (tok.size() < 4) continue;
             // Columns: sl local_address local_state remote_address ...
-            std::string local = tok.size() > 1 ? tok[1] : "";
-            std::string state = tok.size() > 3 ? tok[3] : "";
-            std::string remote = tok.size() > 2 ? tok[2] : "";
+            std::string local = tok[1]; // tok.size() >= 4 已由上方 continue 保证
+            std::string state = tok[3];
+            std::string remote = tok[2];
             // local format "0100007F:1F90"
             auto colon = local.find(':');
             if (colon == std::string::npos) continue;
@@ -394,7 +394,7 @@ std::string SnapshotGenerator::capture_ports() {
                 is_listen = (state == "0A");
             } else {
                 // For UDP, a remote of 00000000:0000 means listening
-                std::string remote = tok.size() > 2 ? tok[2] : "";
+                std::string remote = tok[2];
                 is_listen = (remote == "00000000:0000" || remote.find(":0000") != std::string::npos);
             }
             if (!is_listen) continue;
